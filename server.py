@@ -4,10 +4,11 @@ Logs: which car (RFID), when, how long, how much kWh
 """
 import asyncio
 import logging
-import sqlite3
+import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 
+import psycopg2
 import websockets
 from ocpp.routing import on
 from ocpp.v16 import ChargePoint as CP
@@ -25,58 +26,75 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ocpp-server")
 
-DB_PATH = Path("/data/charging.db")
+DSN = (
+    "host={host} port={port} dbname={dbname} user={user} password={password}"
+    .format(
+        host=os.environ.get("DB_HOST", "localhost"),
+        port=os.environ.get("DB_PORT", "5432"),
+        dbname=os.environ.get("DB_NAME", "ocpp"),
+        user=os.environ.get("DB_USER", "ocpp"),
+        password=os.environ.get("DB_PASSWORD", "ocpp"),
+    )
+)
 
 
 # ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
 
-def init_db():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.executescript("""
-        CREATE TABLE IF NOT EXISTS charge_points (
-            id          TEXT PRIMARY KEY,
-            model       TEXT,
-            vendor      TEXT,
-            firmware    TEXT,
-            last_seen   TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS sessions (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            charge_point_id TEXT NOT NULL,
-            connector_id    INTEGER NOT NULL,
-            transaction_id  INTEGER,
-            id_tag          TEXT,
-            start_time      TEXT,
-            stop_time       TEXT,
-            start_meter_wh  INTEGER,
-            stop_meter_wh   INTEGER,
-            energy_kwh      REAL,
-            stop_reason     TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS meter_values (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            charge_point_id TEXT NOT NULL,
-            transaction_id  INTEGER,
-            timestamp       TEXT,
-            measurand       TEXT,
-            value           TEXT,
-            unit            TEXT
-        );
-    """)
-    conn.commit()
-    conn.close()
-    logger.info("Database initialised at %s", DB_PATH)
-
-
+@contextmanager
 def db():
-    """Return a new DB connection (not thread-safe, but fine for asyncio)."""
-    return sqlite3.connect(DB_PATH)
+    """Context manager: yields a psycopg2 connection that auto-commits/rollbacks."""
+    conn = psycopg2.connect(DSN)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def init_db():
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS charge_points (
+                id          TEXT PRIMARY KEY,
+                model       TEXT,
+                vendor      TEXT,
+                firmware    TEXT,
+                last_seen   TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id              SERIAL PRIMARY KEY,
+                charge_point_id TEXT NOT NULL,
+                connector_id    INTEGER NOT NULL,
+                transaction_id  INTEGER,
+                id_tag          TEXT,
+                start_time      TEXT,
+                stop_time       TEXT,
+                start_meter_wh  INTEGER,
+                stop_meter_wh   INTEGER,
+                energy_kwh      REAL,
+                stop_reason     TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS meter_values (
+                id              SERIAL PRIMARY KEY,
+                charge_point_id TEXT NOT NULL,
+                transaction_id  INTEGER,
+                timestamp       TEXT,
+                measurand       TEXT,
+                value           TEXT,
+                unit            TEXT
+            )
+        """)
+    logger.info("Database initialised")
 
 
 # ---------------------------------------------------------------------------
@@ -98,14 +116,15 @@ class ChargePoint(CP):
                                    firmware_version=None, **kwargs):
         now = datetime.now(timezone.utc).isoformat()
         with db() as conn:
-            conn.execute("""
+            cur = conn.cursor()
+            cur.execute("""
                 INSERT INTO charge_points (id, model, vendor, firmware, last_seen)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT(id) DO UPDATE SET
-                    model=excluded.model,
-                    vendor=excluded.vendor,
-                    firmware=excluded.firmware,
-                    last_seen=excluded.last_seen
+                    model=EXCLUDED.model,
+                    vendor=EXCLUDED.vendor,
+                    firmware=EXCLUDED.firmware,
+                    last_seen=EXCLUDED.last_seen
             """, (self._cp_id, charge_point_model, charge_point_vendor,
                   firmware_version, now))
         logger.info("[%s] Boot: vendor=%s model=%s firmware=%s",
@@ -123,8 +142,9 @@ class ChargePoint(CP):
     async def on_heartbeat(self, **kwargs):
         now = datetime.now(timezone.utc).isoformat()
         with db() as conn:
-            conn.execute("UPDATE charge_points SET last_seen=? WHERE id=?",
-                         (now, self._cp_id))
+            cur = conn.cursor()
+            cur.execute("UPDATE charge_points SET last_seen=%s WHERE id=%s",
+                        (now, self._cp_id))
         return call_result.HeartbeatPayload(current_time=now)
 
     # --- Authorize ----------------------------------------------------------
@@ -144,22 +164,21 @@ class ChargePoint(CP):
                                    meter_start, timestamp,
                                    reservation_id=None, **kwargs):
         with db() as conn:
-            cur = conn.execute("""
+            cur = conn.cursor()
+            cur.execute("""
                 INSERT INTO sessions
                     (charge_point_id, connector_id, id_tag,
                      start_time, start_meter_wh)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
             """, (self._cp_id, connector_id, id_tag,
                   timestamp, meter_start))
-            session_id = cur.lastrowid
+            session_id = cur.fetchone()[0]
+            transaction_id = session_id  # re-use row id as transaction id
+            cur.execute("UPDATE sessions SET transaction_id=%s WHERE id=%s",
+                        (transaction_id, session_id))
 
         self._active_sessions[connector_id] = session_id
-        transaction_id = session_id  # re-use row id as transaction id
-
-        # Write transaction_id back
-        with db() as conn:
-            conn.execute("UPDATE sessions SET transaction_id=? WHERE id=?",
-                         (transaction_id, session_id))
 
         logger.info("[%s] StartTransaction: connector=%d id_tag=%s meter=%d Wh  "
                     "-> transaction_id=%d",
@@ -178,19 +197,21 @@ class ChargePoint(CP):
                                   timestamp, reason=None,
                                   id_tag=None, **kwargs):
         with db() as conn:
-            row = conn.execute(
-                "SELECT id, connector_id, start_meter_wh FROM sessions WHERE transaction_id=?",
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, connector_id, start_meter_wh FROM sessions WHERE transaction_id=%s",
                 (transaction_id,)
-            ).fetchone()
+            )
+            row = cur.fetchone()
 
             if row:
                 session_id, connector_id, start_wh = row
                 energy_kwh = (meter_stop - start_wh) / 1000.0
-                conn.execute("""
+                cur.execute("""
                     UPDATE sessions
-                    SET stop_time=?, stop_meter_wh=?,
-                        energy_kwh=?, stop_reason=?
-                    WHERE id=?
+                    SET stop_time=%s, stop_meter_wh=%s,
+                        energy_kwh=%s, stop_reason=%s
+                    WHERE id=%s
                 """, (timestamp, meter_stop, energy_kwh, reason, session_id))
                 self._active_sessions.pop(connector_id, None)
 
@@ -226,11 +247,12 @@ class ChargePoint(CP):
 
         if rows:
             with db() as conn:
-                conn.executemany("""
+                cur = conn.cursor()
+                cur.executemany("""
                     INSERT INTO meter_values
                         (charge_point_id, transaction_id, timestamp,
                          measurand, value, unit)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """, rows)
             logger.info("[%s] MeterValues: %d sample(s) for transaction %s",
                         self._cp_id, len(rows), transaction_id)

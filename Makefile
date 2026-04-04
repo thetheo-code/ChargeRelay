@@ -1,4 +1,4 @@
-.PHONY: up down logs build restart
+.PHONY: up down logs build restart test
 
 up:
 	docker compose up --build -d
@@ -14,3 +14,6 @@ build:
 
 restart:
 	docker compose restart ocpp-server
+
+test:
+	python3 test_client.py

@@ -1,6 +1,4 @@
 services:
   ocpp-server:
-    volumes:
-      - ./data:/data
     ports:
       - "9000:9000"
