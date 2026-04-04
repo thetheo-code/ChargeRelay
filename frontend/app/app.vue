@@ -66,7 +66,7 @@
               </div>
               <div class="metric" v-if="getMeter(s, 'Current.Import')">
                 <div class="metric__label">Strom</div>
-                <div class="metric__value">{{ Number(getMeter(s, 'Current.Import')?.value).toFixed(1) }}<span class="metric__unit">A</span></div>
+                <div class="metric__value">{{ Number(getMeter(s, 'Current.Import')?.value).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}<span class="metric__unit">A</span></div>
               </div>
               <div class="metric" v-if="getMeter(s, 'Voltage')">
                 <div class="metric__label">Spannung</div>
@@ -520,8 +520,8 @@ function formatEnergy(m: MeterValue | null) {
 function formatPower(m: MeterValue | null) {
   if (!m) return '–'
   const v = Number(m.value)
-  if (m.unit === 'W') return (v / 1000).toFixed(2)
-  return v.toFixed(2)
+  const kw = m.unit === 'W' ? v / 1000 : v
+  return kw.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -795,7 +795,6 @@ body {
   font-size: 0.875rem;
   font-weight: 400;
   color: var(--text-muted);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 .metric__unit {
   font-size: 0.8rem;
