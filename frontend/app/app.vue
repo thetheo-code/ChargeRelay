@@ -5,7 +5,6 @@
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__brand">
-          <span class="topbar__bolt">⚡</span>
           <span class="topbar__title">Wallbox</span>
         </div>
         <nav class="topbar__nav">
@@ -55,7 +54,7 @@
               </div>
               <div class="metric" v-if="getMeter(s, 'Energy.Active.Import.Register')">
                 <div class="metric__label">Energie</div>
-                <div class="metric__value metric__value--accent">{{ formatEnergy(getMeter(s, 'Energy.Active.Import.Register')) }}</div>
+                <div class="metric__value metric__value--accent">{{ formatEnergy(getMeter(s, 'Energy.Active.Import.Register')) }}<span class="metric__unit">kWh</span></div>
               </div>
               <div class="metric" v-if="getMeter(s, 'Power.Active.Import')">
                 <div class="metric__label">Leistung</div>
@@ -75,7 +74,7 @@
               </div>
               <div class="metric metric--date">
                 <div class="metric__label">Gestartet</div>
-                <div class="metric__value metric__value--date">{{ formatDate(s.start_time) }}</div>
+                <div class="metric__value metric__value--date">{{ formatTime(s.start_time) }}</div>
               </div>
             </div>
 
@@ -506,11 +505,16 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function formatTime(iso: string | null) {
+  if (!iso) return '–'
+  return new Date(iso).toLocaleString('de-DE', { timeStyle: 'short' })
+}
+
 function formatEnergy(m: MeterValue | null) {
   if (!m) return '–'
   const v = Number(m.value)
   const kwh = (m.unit === 'Wh' || v > 1000) ? v / 1000 : v
-  return kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kWh'
+  return kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatPower(m: MeterValue | null) {
@@ -781,7 +785,7 @@ body {
 }
 .metric__value {
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
