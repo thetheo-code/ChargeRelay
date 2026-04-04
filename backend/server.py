@@ -94,6 +94,18 @@ def init_db():
                 unit            TEXT
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS vehicles (
+                id          SERIAL PRIMARY KEY,
+                name        TEXT NOT NULL,
+                id_tag      TEXT UNIQUE,
+                image_data  TEXT,
+                created_at  TEXT
+            )
+        """)
+        cur.execute("""
+            ALTER TABLE sessions ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id)
+        """)
     logger.info("Database initialised")
 
 
@@ -177,6 +189,13 @@ class ChargePoint(CP):
             transaction_id = session_id  # re-use row id as transaction id
             cur.execute("UPDATE sessions SET transaction_id=%s WHERE id=%s",
                         (transaction_id, session_id))
+
+            # Auto-assign vehicle by id_tag
+            cur.execute("SELECT id FROM vehicles WHERE id_tag = %s", (id_tag,))
+            vehicle_row = cur.fetchone()
+            if vehicle_row:
+                cur.execute("UPDATE sessions SET vehicle_id = %s WHERE id = %s",
+                            (vehicle_row[0], session_id))
 
         self._active_sessions[connector_id] = session_id
 

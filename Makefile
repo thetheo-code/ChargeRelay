@@ -16,4 +16,4 @@ restart:
 	docker compose restart ocpp-server
 
 test:
-	python3 test_client.py
+	python3 backend/test_client.py

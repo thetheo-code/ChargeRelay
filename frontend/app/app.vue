@@ -2,137 +2,273 @@
   <div class="app">
     <header class="topbar">
       <div class="topbar__inner">
-        <div class="topbar__title">
-          OCPP Ladestation
-        </div>
+        <div class="topbar__title">Wallbox</div>
         <span class="topbar__refresh" :class="{ spinning: loading }" @click="refresh">↻</span>
       </div>
     </header>
 
-    <!-- Aktive Ladung -->
-    <section class="active-section">
-      <div v-if="activeLoading" class="active-card active-card--loading">
-        <div class="pulse">Lade aktive Session …</div>
-      </div>
+    <nav class="tab-nav">
+      <button class="tab-btn" :class="{ 'tab-btn--active': activeTab === 'overview' }" @click="activeTab = 'overview'">Übersicht</button>
+      <button class="tab-btn" :class="{ 'tab-btn--active': activeTab === 'vehicles' }" @click="switchToVehicles">Fahrzeuge</button>
+    </nav>
 
-      <div v-else-if="activeSessions.length === 0" class="active-card active-card--idle">
-        <div class="idle-text">Kein aktiver Ladevorgang</div>
-      </div>
+    <!-- ── Übersicht ─────────────────────────────────────────────────────── -->
+    <template v-if="activeTab === 'overview'">
+      <section class="active-section">
+        <div v-if="activeLoading" class="active-card active-card--loading">
+          <div class="pulse">Lade aktive Session …</div>
+        </div>
+        <div v-else-if="activeSessions.length === 0" class="active-card active-card--idle">
+          <div class="idle-text">Kein aktiver Ladevorgang</div>
+        </div>
+        <div v-else v-for="s in activeSessions" :key="s.session_id" class="active-card active-card--charging">
+          <div class="active-card__layout" :class="{ 'active-card__layout--with-vehicle': s.vehicle_id }">
 
-      <div v-else v-for="s in activeSessions" :key="s.session_id" class="active-card active-card--charging">
-        <div class="active-card__header">
-          <div>
-            <div class="active-card__label">Aktuelle Ladung</div>
-            <div class="active-card__cp">{{ s.model || s.charge_point_id }} <span class="badge">Connector {{ s.connector_id }}</span></div>
-          </div>
-          <div class="active-card__tag">
-            <div class="active-card__label">Ausweis</div>
-            <div class="active-card__value">{{ s.id_tag }}</div>
+            <!-- LEFT / INFO column -->
+            <div class="active-card__info">
+              <div class="active-card__header">
+                <div>
+                  <div class="active-card__label">Aktuelle Ladung</div>
+                  <div class="active-card__cp">{{ s.model || s.charge_point_id }} <span class="badge">Connector {{ s.connector_id }}</span></div>
+                </div>
+
+                <!-- Fahrzeug-Zuweisung nur wenn noch keins zugewiesen -->
+                <div v-if="!s.vehicle_id" class="active-card__vehicle-block">
+                  <div class="active-card__label">Fahrzeug</div>
+                  <div class="vehicle-assign">
+                    <select v-model="sessionVehicleSelection[s.session_id]" class="sel" :disabled="vehicles.length === 0">
+                      <option v-if="vehicles.length === 0" :value="null">Keine Fahrzeuge</option>
+                      <option v-for="v in vehicles" :key="v.id" :value="v.id">{{ v.name }}</option>
+                    </select>
+                    <button class="btn btn--sm btn--primary" @click="assignVehicle(s.session_id)" :disabled="!sessionVehicleSelection[s.session_id]">Zuweisen</button>
+                  </div>
+                </div>
+
+
+              </div>
+
+              <div class="active-card__metrics">
+                <div class="metric">
+                  <div class="metric__label">Laufzeit</div>
+                  <div class="metric__value">{{ formatDuration(s.duration_seconds) }}</div>
+                </div>
+                <div class="metric" v-if="getMeter(s, 'Energy.Active.Import.Register')">
+                  <div class="metric__label">Energie</div>
+                  <div class="metric__value">{{ formatEnergy(getMeter(s, 'Energy.Active.Import.Register')) }}</div>
+                </div>
+                <div class="metric" v-if="getMeter(s, 'Power.Active.Import')">
+                  <div class="metric__label">Leistung</div>
+                  <div class="metric__value">{{ formatPower(getMeter(s, 'Power.Active.Import')) }} kW</div>
+                </div>
+                <div class="metric" v-if="getMeter(s, 'Current.Import')">
+                  <div class="metric__label">Strom</div>
+                  <div class="metric__value">{{ Number(getMeter(s, 'Current.Import')?.value).toFixed(1) }} A</div>
+                </div>
+                <div class="metric" v-if="getMeter(s, 'Voltage')">
+                  <div class="metric__label">Spannung</div>
+                  <div class="metric__value">{{ Number(getMeter(s, 'Voltage')?.value).toFixed(0) }} V</div>
+                </div>
+                <div class="metric" v-if="getMeter(s, 'SoC')">
+                  <div class="metric__label">Ladestand</div>
+                  <div class="metric__value">{{ Number(getMeter(s, 'SoC')?.value).toFixed(0) }} %</div>
+                </div>
+                <div class="metric">
+                  <div class="metric__label">Gestartet</div>
+                  <div class="metric__value metric__value--sm">{{ formatDate(s.start_time) }}</div>
+                </div>
+              </div>
+
+              <div class="progress-bar-wrap" v-if="getMeter(s, 'SoC')" style="margin-top: 0.25rem;">
+                <div class="progress-bar" :style="{ width: Number(getMeter(s, 'SoC')?.value) + '%' }"></div>
+              </div>
+
+            </div><!-- /active-card__info -->
+
+            <!-- RIGHT: Fahrzeug-Hero -->
+            <div v-if="s.vehicle_id" class="vehicle-hero">
+              <div class="vehicle-hero__img-wrap">
+                <img v-if="getVehicle(s.vehicle_id)?.image_data" :src="getVehicle(s.vehicle_id)?.image_data ?? ''" class="vehicle-hero__img" alt="">
+                <div v-else class="vehicle-hero__placeholder">🚗</div>
+              </div>
+              <div class="vehicle-hero__name">
+                {{ s.vehicle_name }}
+                <span v-if="getVehicle(s.vehicle_id)?.id_tag && getVehicle(s.vehicle_id)?.id_tag === s.id_tag" class="vehicle-hero__rfid-check" title="Automatisch per RFID erkannt">✓</span>
+              </div>
+            </div>
+
+          </div><!-- /active-card__layout -->
+
+          <!-- Animierter Ladebalken – volle Breite -->
+          <div class="charging-bar-wrap">
+            <div class="charging-bar">
+              <div class="charging-bar__fill"></div>
+            </div>
+            <div class="charging-bar__label">Laden aktiv</div>
           </div>
         </div>
+      </section>
 
-        <div class="active-card__metrics">
-          <div class="metric">
-            <div class="metric__label">Laufzeit</div>
-            <div class="metric__value">{{ formatDuration(s.duration_seconds) }}</div>
-          </div>
-          <div class="metric" v-if="getMeter(s, 'Energy.Active.Import.Register')">
-            <div class="metric__label">Energie</div>
-            <div class="metric__value">{{ formatEnergy(getMeter(s, 'Energy.Active.Import.Register')) }}</div>
-          </div>
-          <div class="metric" v-if="getMeter(s, 'Power.Active.Import')">
-            <div class="metric__label">Leistung</div>
-            <div class="metric__value">{{ formatPower(getMeter(s, 'Power.Active.Import')) }} kW</div>
-          </div>
-          <div class="metric" v-if="getMeter(s, 'Current.Import')">
-            <div class="metric__label">Strom</div>
-            <div class="metric__value">{{ Number(getMeter(s, 'Current.Import')?.value).toFixed(1) }} A</div>
-          </div>
-          <div class="metric" v-if="getMeter(s, 'Voltage')">
-            <div class="metric__label">Spannung</div>
-            <div class="metric__value">{{ Number(getMeter(s, 'Voltage')?.value).toFixed(0) }} V</div>
-          </div>
-          <div class="metric" v-if="getMeter(s, 'SoC')">
-            <div class="metric__label">Ladestand</div>
-            <div class="metric__value">{{ Number(getMeter(s, 'SoC')?.value).toFixed(0) }} %</div>
-          </div>
-          <div class="metric">
-            <div class="metric__label">Gestartet</div>
-            <div class="metric__value metric__value--sm">{{ formatDate(s.start_time) }}</div>
-          </div>
+      <section class="history-section">
+        <h2 class="history-title">Letzte Ladevorgänge</h2>
+        <div v-if="historyLoading" class="pulse">Lade Verlauf …</div>
+        <div v-else class="table-wrap">
+          <table class="session-table">
+            <thead>
+              <tr>
+                <th>Ladestation</th>
+                <th>Fahrzeug / Ausweis</th>
+                <th>Start</th>
+                <th>Ende</th>
+                <th>Energie</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in sessions" :key="s.session_id" :class="{ 'row--active': !s.stop_time }">
+                <td>
+                  <span class="cp-name">{{ s.model || s.charge_point_id }}</span>
+                  <span class="connector-badge">C{{ s.connector_id }}</span>
+                </td>
+                <td>
+                  <div v-if="s.vehicle_name" class="cell-vehicle">
+                    <span class="cell-vehicle__name">{{ s.vehicle_name }}</span>
+                    <span class="cell-vehicle__tag mono">{{ s.id_tag }}</span>
+                  </div>
+                  <span v-else class="mono">{{ s.id_tag || '–' }}</span>
+                </td>
+                <td class="mono">{{ formatDate(s.start_time) }}</td>
+                <td class="mono">{{ s.stop_time ? formatDate(s.stop_time) : '–' }}</td>
+                <td class="mono energy">{{ s.energy_kwh != null ? s.energy_kwh.toFixed(3) + ' kWh' : '–' }}</td>
+                <td>
+                  <span v-if="!s.stop_time" class="status status--active">Aktiv</span>
+                  <span v-else class="status status--done">Fertig</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button :disabled="page <= 1" @click="changePage(page - 1)">‹ Zurück</button>
+          <span>Seite {{ page }} / {{ totalPages }}</span>
+          <button :disabled="page >= totalPages" @click="changePage(page + 1)">Weiter ›</button>
+        </div>
+      </section>
+    </template>
+
+    <!-- ── Fahrzeuge ─────────────────────────────────────────────────────── -->
+    <template v-if="activeTab === 'vehicles'">
+      <section class="vehicles-section">
+        <div class="section-header">
+          <h2 class="section-title">Fahrzeuge</h2>
+          <button class="btn btn--primary" @click="openNewVehicleForm">+ Neues Fahrzeug</button>
         </div>
 
-        <div class="progress-bar-wrap" v-if="getMeter(s, 'SoC')">
-          <div class="progress-bar" :style="{ width: Number(getMeter(s, 'SoC')?.value) + '%' }"></div>
+        <div v-if="vehiclesLoading" class="pulse" style="padding: 2rem">Lade Fahrzeuge …</div>
+
+        <div v-else-if="vehicles.length === 0" class="empty-state">
+          Noch keine Fahrzeuge registriert. Lege jetzt dein erstes Fahrzeug an.
+        </div>
+
+        <div v-else class="vehicles-grid">
+          <div v-for="v in vehicles" :key="v.id" class="vehicle-card">
+            <div class="vehicle-card__img-wrap">
+              <img v-if="v.image_data" :src="v.image_data" class="vehicle-card__img" alt="">
+              <div v-else class="vehicle-card__no-img">🚗</div>
+            </div>
+            <div class="vehicle-card__body">
+              <div class="vehicle-card__name">{{ v.name }}</div>
+              <div v-if="v.id_tag" class="vehicle-card__rfid">
+                <span class="badge-rfid">RFID: {{ v.id_tag }}</span>
+              </div>
+              <div v-else class="vehicle-card__rfid vehicle-card__rfid--none">Kein RFID-Tag</div>
+            </div>
+            <div class="vehicle-card__actions">
+              <button class="btn btn--sm btn--ghost" @click="openEditVehicleForm(v)">Bearbeiten</button>
+              <button class="btn btn--sm btn--danger" @click="confirmDeleteVehicle(v)">Löschen</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <!-- ── Vehicle Form Modal ────────────────────────────────────────────── -->
+    <div class="modal-overlay" v-if="showVehicleForm" @click.self="showVehicleForm = false">
+      <div class="modal">
+        <div class="modal__header">
+          <h3 class="modal__title">{{ editingVehicle ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug' }}</h3>
+          <button class="modal__close" @click="showVehicleForm = false">✕</button>
+        </div>
+        <div class="modal__body">
+          <div class="form-group">
+            <label class="form-label">Bild</label>
+            <div class="image-upload">
+              <img v-if="vehicleForm.image_data" :src="vehicleForm.image_data" class="image-preview" alt="">
+              <div v-else class="image-placeholder">Kein Bild ausgewählt</div>
+              <div class="image-upload__btns">
+                <label class="btn btn--ghost btn--sm">
+                  Bild wählen
+                  <input type="file" accept="image/*" class="sr-only" @change="handleImageUpload">
+                </label>
+                <button v-if="vehicleForm.image_data" class="btn btn--ghost btn--sm" @click="vehicleForm.image_data = null">Entfernen</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Name <span class="required">*</span></label>
+            <input v-model="vehicleForm.name" class="form-input" placeholder="z.B. Tesla Model 3" type="text">
+          </div>
+          <div class="form-group">
+            <label class="form-label">RFID-Tag</label>
+            <input v-model="vehicleForm.id_tag" class="form-input mono" placeholder="z.B. RFID-0001" type="text">
+            <div class="form-hint">Wird beim Laden per RFID automatisch erkannt und zugewiesen</div>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--ghost" @click="showVehicleForm = false">Abbrechen</button>
+          <button class="btn btn--primary" @click="saveVehicle" :disabled="!vehicleForm.name.trim() || savingVehicle">
+            {{ savingVehicle ? 'Speichern …' : 'Speichern' }}
+          </button>
         </div>
       </div>
-    </section>
-
-    <!-- Letzte Ladevorgänge -->
-    <section class="history-section">
-      <h2 class="history-title">Letzte Ladevorgänge</h2>
-
-      <div v-if="historyLoading" class="pulse">Lade Verlauf …</div>
-
-      <div v-else class="table-wrap">
-        <table class="session-table">
-          <thead>
-            <tr>
-              <th>Ladestation</th>
-              <th>Ausweis</th>
-              <th>Start</th>
-              <th>Ende</th>
-              <th>Energie</th>
-              <th>Grund</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in sessions" :key="s.session_id" :class="{ 'row--active': !s.stop_time }">
-              <td>
-                <span class="cp-name">{{ s.model || s.charge_point_id }}</span>
-                <span class="connector-badge">C{{ s.connector_id }}</span>
-              </td>
-              <td class="mono">{{ s.id_tag }}</td>
-              <td class="mono">{{ formatDate(s.start_time) }}</td>
-              <td class="mono">{{ s.stop_time ? formatDate(s.stop_time) : '–' }}</td>
-              <td class="mono energy">{{ s.energy_kwh != null ? s.energy_kwh.toFixed(3) + ' kWh' : '–' }}</td>
-              <td>{{ s.stop_reason || '–' }}</td>
-              <td>
-                <span v-if="!s.stop_time" class="status status--active">Aktiv</span>
-                <span v-else class="status status--done">Fertig</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="pagination">
-        <button :disabled="page <= 1" @click="changePage(page - 1)">‹ Zurück</button>
-        <span>Seite {{ page }} / {{ totalPages }}</span>
-        <button :disabled="page >= totalPages" @click="changePage(page + 1)">Weiter ›</button>
-      </div>
-    </section>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const API = 'http://localhost:8000'
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface Vehicle {
+  id: number
+  name: string
+  id_tag: string | null
+  image_data: string | null
+  created_at: string
+}
+
 interface MeterValue { measurand: string; value: string; unit: string; timestamp: string }
+
 interface ActiveSession {
   session_id: number; connector_id: number; transaction_id: number | null
   id_tag: string; start_time: string; start_meter_wh: number | null
   charge_point_id: string; model: string | null; vendor: string | null
   duration_seconds: number | null; latest_meter_values: MeterValue[]
+  vehicle_id: number | null; vehicle_name: string | null
 }
+
 interface Session {
   session_id: number; connector_id: number; transaction_id: number | null
   id_tag: string; start_time: string; stop_time: string | null
   start_meter_wh: number | null; stop_meter_wh: number | null
   energy_kwh: number | null; stop_reason: string | null
   charge_point_id: string; model: string | null; vendor: string | null
+  vehicle_id: number | null; vehicle_name: string | null
 }
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+const activeTab = ref<'overview' | 'vehicles'>('overview')
 
 const activeSessions = ref<ActiveSession[]>([])
 const activeLoading = ref(true)
@@ -143,11 +279,48 @@ const page = ref(1)
 const totalPages = ref(1)
 const PAGE_SIZE = 20
 
+const vehicles = ref<Vehicle[]>([])
+const vehiclesLoading = ref(false)
+const showVehicleForm = ref(false)
+const savingVehicle = ref(false)
+const editingVehicle = ref<Vehicle | null>(null)
+const vehicleForm = ref({ name: '', id_tag: '', image_data: null as string | null })
+
+// keyed by session_id: pre-selected vehicle for manual assignment
+const sessionVehicleSelection = ref<Record<number, number | null>>({})
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function getVehicle(id: number | null): Vehicle | undefined {
+  if (id === null) return undefined
+  return vehicles.value.find(v => v.id === id)
+}
+
+function initSessionSelections() {
+  for (const s of activeSessions.value) {
+    if (s.vehicle_id === null && !(s.session_id in sessionVehicleSelection.value)) {
+      sessionVehicleSelection.value[s.session_id] = vehicles.value[0]?.id ?? null
+    }
+  }
+}
+
+// ── Data fetching ──────────────────────────────────────────────────────────
+
+async function fetchVehicles() {
+  vehiclesLoading.value = true
+  try {
+    vehicles.value = await $fetch<Vehicle[]>(`${API}/api/vehicles`)
+    initSessionSelections()
+  } catch { vehicles.value = [] }
+  finally { vehiclesLoading.value = false }
+}
+
 async function fetchActive() {
   activeLoading.value = true
   try {
     const data = await $fetch<ActiveSession[]>(`${API}/api/active`)
     activeSessions.value = data
+    initSessionSelections()
   } catch { activeSessions.value = [] }
   finally { activeLoading.value = false }
 }
@@ -174,6 +347,84 @@ async function changePage(p: number) {
   page.value = p
   await fetchSessions()
 }
+
+async function switchToVehicles() {
+  activeTab.value = 'vehicles'
+  await fetchVehicles()
+}
+
+// ── Vehicle CRUD ───────────────────────────────────────────────────────────
+
+function openNewVehicleForm() {
+  editingVehicle.value = null
+  vehicleForm.value = { name: '', id_tag: '', image_data: null }
+  showVehicleForm.value = true
+}
+
+function openEditVehicleForm(v: Vehicle) {
+  editingVehicle.value = v
+  vehicleForm.value = { name: v.name, id_tag: v.id_tag || '', image_data: v.image_data }
+  showVehicleForm.value = true
+}
+
+function handleImageUpload(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (e) => { vehicleForm.value.image_data = e.target?.result as string }
+  reader.readAsDataURL(file)
+}
+
+async function saveVehicle() {
+  if (!vehicleForm.value.name.trim()) return
+  savingVehicle.value = true
+  try {
+    const body = {
+      name: vehicleForm.value.name.trim(),
+      id_tag: vehicleForm.value.id_tag.trim() || null,
+      image_data: vehicleForm.value.image_data,
+    }
+    if (editingVehicle.value) {
+      await $fetch(`${API}/api/vehicles/${editingVehicle.value.id}`, { method: 'PUT', body })
+    } else {
+      await $fetch(`${API}/api/vehicles`, { method: 'POST', body })
+    }
+    showVehicleForm.value = false
+    await fetchVehicles()
+  } catch {
+    alert('Fehler beim Speichern. Bitte prüfe die Eingaben.')
+  } finally {
+    savingVehicle.value = false
+  }
+}
+
+async function confirmDeleteVehicle(v: Vehicle) {
+  if (!confirm(`Fahrzeug "${v.name}" wirklich löschen?`)) return
+  try {
+    await $fetch(`${API}/api/vehicles/${v.id}`, { method: 'DELETE' })
+    await fetchVehicles()
+  } catch {
+    alert('Fehler beim Löschen.')
+  }
+}
+
+// ── Session vehicle assignment ─────────────────────────────────────────────
+
+async function assignVehicle(session_id: number) {
+  const vehicle_id = sessionVehicleSelection.value[session_id]
+  if (!vehicle_id) return
+  try {
+    await $fetch(`${API}/api/sessions/${session_id}/vehicle`, {
+      method: 'PUT',
+      body: { vehicle_id },
+    })
+    await fetchActive()
+  } catch {
+    alert('Fehler beim Zuweisen des Fahrzeugs.')
+  }
+}
+
+// ── Formatters ─────────────────────────────────────────────────────────────
 
 function getMeter(s: ActiveSession, measurand: string) {
   return s.latest_meter_values.find(m => m.measurand === measurand) ?? null
@@ -208,8 +459,12 @@ function formatPower(m: MeterValue | null) {
   return v.toFixed(2)
 }
 
-onMounted(() => refresh())
-// Auto-refresh alle 10 Sekunden
+// ── Lifecycle ──────────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  await fetchVehicles()
+  await refresh()
+})
 const interval = setInterval(refresh, 10_000)
 onUnmounted(() => clearInterval(interval))
 </script>
@@ -242,171 +497,293 @@ body {
 .topbar__inner { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .topbar__title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.03em; color: #1a202c; }
 .topbar__refresh {
-  cursor: pointer; font-size: 1.4rem; color: #3182ce;
-  transition: transform 0.4s ease;
-  user-select: none;
+  cursor: pointer; font-size: 1.4rem; color: #16a34a;
+  transition: transform 0.4s ease; user-select: none;
 }
-.topbar__refresh:hover { color: #2b6cb0; }
+.topbar__refresh:hover { color: #15803d; }
 .topbar__refresh.spinning { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tab Nav ────────────────────────────────────────────── */
+.tab-nav {
+  display: flex;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 2rem;
+  position: sticky;
+  top: 56px;
+  z-index: 99;
+}
+.tab-btn {
+  background: none; border: none;
+  border-bottom: 3px solid transparent;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem; font-weight: 500;
+  color: #718096; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: #2d3748; }
+.tab-btn--active { color: #16a34a; border-bottom-color: #16a34a; }
 
 /* ── Active section ─────────────────────────────────────── */
 .active-section { padding: 2rem 2rem 1rem; }
 
-.active-card {
-  border-radius: 16px;
-  padding: 2rem 2.5rem;
-  width: 100%;
-}
+.active-card { border-radius: 16px; padding: 2rem 2.5rem; width: 100%; }
 
 .active-card--loading,
 .active-card--idle {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  min-height: 140px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: #ffffff; border: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1rem; min-height: 140px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-
 .idle-text { color: #718096; font-size: 1.1rem; }
 
 .active-card--charging {
-  background: linear-gradient(135deg, #ebf8ff 0%, #e6f0fd 50%, #f0f4ff 100%);
-  border: 1px solid #bee3f8;
-  box-shadow: 0 4px 24px rgba(49, 130, 206, 0.1), 0 1px 4px rgba(0,0,0,0.06);
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #f0fdf4 100%);
+  border: 1px solid #86efac;
+  box-shadow: 0 4px 24px rgba(22, 163, 74, 0.1), 0 1px 4px rgba(0,0,0,0.06);
+  margin-bottom: 1rem;
 }
 
 .active-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
 }
-.active-card__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: #3182ce; margin-bottom: 0.25rem; }
+.active-card__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: #16a34a; margin-bottom: 0.25rem; }
 .active-card__cp { font-size: 1.5rem; font-weight: 700; color: #1a202c; display: flex; align-items: center; gap: 0.6rem; }
 .active-card__tag .active-card__value { font-size: 1rem; font-family: monospace; color: #2d3748; }
-.badge {
-  font-size: 0.7rem; background: #bee3f8; color: #2b6cb0;
-  padding: 2px 8px; border-radius: 99px; font-weight: 600;
+.badge { font-size: 0.7rem; background: #bbf7d0; color: #15803d; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+
+/* Active card layout */
+.active-card__layout {
+  display: flex;
+  flex-direction: column;
+}
+.active-card__layout--with-vehicle {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+.active-card__info { min-width: 0; }
+
+/* Vehicle hero – rechts, beinahe so groß wie der Ladebalken */
+.vehicle-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  min-width: 180px;
+  max-width: 240px;
+  gap: 0.55rem;
+}
+.vehicle-hero__img-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.vehicle-hero__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  border-radius: 12px;
+  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.18));
+  transition: filter 0.3s;
+}
+.vehicle-hero__placeholder {
+  font-size: 5rem;
+  line-height: 1;
+  text-align: right;
+}
+.vehicle-hero__name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1a202c;
+  text-align: right;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+.vehicle-hero__rfid-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(22, 163, 74, 0.4);
 }
 
-.active-card__metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem 2.5rem;
-  margin-bottom: 1.5rem;
+/* Vehicle block in active card (no vehicle – assign widget) */
+.active-card__vehicle-block { min-width: 180px; }
+.vehicle-assign { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.sel {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 5px 10px; font-size: 0.875rem; background: #fff; color: #2d3748; cursor: pointer;
 }
-.metric__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #3182ce; margin-bottom: 0.2rem; }
+.sel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.active-card__metrics { display: flex; flex-wrap: wrap; gap: 1rem 2.5rem; margin-bottom: 1.5rem; }
+.metric__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #16a34a; margin-bottom: 0.2rem; }
 .metric__value { font-size: 1.6rem; font-weight: 700; color: #1a202c; font-variant-numeric: tabular-nums; }
 .metric__value--sm { font-size: 1rem; font-weight: 400; color: #4a5568; }
 
-.progress-bar-wrap {
-  background: #e2e8f0;
-  border-radius: 99px;
-  height: 8px;
-  overflow: hidden;
+.progress-bar-wrap { background: #e2e8f0; border-radius: 99px; height: 8px; overflow: hidden; }
+.progress-bar { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #16a34a, #4ade80); transition: width 1s ease; }
+
+/* ── Animierter Ladebalken ──────────────────────────────── */
+.charging-bar-wrap {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-top: 1rem;
 }
-.progress-bar {
-  height: 100%;
-  border-radius: 99px;
-  background: linear-gradient(90deg, #3182ce, #63b3ed);
-  transition: width 1s ease;
+.charging-bar {
+  flex: 1; background: rgba(220, 252, 231, 0.8); border-radius: 99px;
+  height: 12px; overflow: hidden;
+  border: 1px solid rgba(134, 239, 172, 0.6);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.25);
+}
+.charging-bar__fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, #16a34a 0%, #22c55e 30%, #4ade80 50%, #22c55e 70%, #16a34a 100%);
+  background-size: 200% 100%;
+  animation: chargingFlow 2s linear infinite;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}
+.charging-bar__label {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: #16a34a; font-weight: 700; white-space: nowrap;
+  display: flex; align-items: center; gap: 0.3rem;
+}
+.charging-bar__label::before {
+  content: ''; display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; background: #22c55e;
+  animation: pulse-dot 1.4s ease-in-out infinite;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.8);
+}
+@keyframes chargingFlow {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.7); }
 }
 
 /* ── History section ────────────────────────────────────── */
 .history-section { padding: 1rem 2rem 3rem; }
 .history-title { font-size: 1.1rem; font-weight: 600; color: #4a5568; margin-bottom: 1rem; letter-spacing: 0.04em; }
 
-.table-wrap {
-  overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
+.table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 
-.session-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-.session-table thead {
-  background: #f7fafc;
-}
+.session-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.session-table thead { background: #f7fafc; }
 .session-table th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #718096;
-  border-bottom: 1px solid #e2e8f0;
-  white-space: nowrap;
+  padding: 0.75rem 1rem; text-align: left; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: #718096;
+  border-bottom: 1px solid #e2e8f0; white-space: nowrap;
 }
-.session-table td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f0f4f8;
-  color: #2d3748;
-  vertical-align: middle;
-}
+.session-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f0f4f8; color: #2d3748; vertical-align: middle; }
 .session-table tbody tr:last-child td { border-bottom: none; }
 .session-table tbody tr { background: #ffffff; transition: background 0.15s; }
 .session-table tbody tr:hover { background: #f7fafc; }
-.session-table tbody tr.row--active { background: #ebf8ff; }
+.session-table tbody tr.row--active { background: #f0fdf4; }
+
+.cell-vehicle { display: flex; flex-direction: column; gap: 1px; }
+.cell-vehicle__name { font-weight: 600; color: #1a202c; }
+.cell-vehicle__tag { font-size: 0.75rem; color: #718096; }
 
 .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
 .energy { color: #276749; font-weight: 600; }
-
 .cp-name { font-weight: 600; color: #1a202c; }
-.connector-badge {
-  display: inline-block; margin-left: 6px;
-  font-size: 0.65rem; background: #edf2f7; color: #718096;
-  padding: 1px 6px; border-radius: 99px;
-}
+.connector-badge { display: inline-block; margin-left: 6px; font-size: 0.65rem; background: #edf2f7; color: #718096; padding: 1px 6px; border-radius: 99px; }
 
-.status {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 99px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-}
+.status { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; }
 .status--active { background: #c6f6d5; color: #276749; }
 .status--done { background: #edf2f7; color: #718096; }
 
 /* ── Pagination ─────────────────────────────────────────── */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  color: #718096;
-  font-size: 0.875rem;
-}
-.pagination button {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  color: #4a5568;
-  padding: 6px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: background 0.15s, color 0.15s;
-}
+.pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.5rem; color: #718096; font-size: 0.875rem; }
+.pagination button { background: #ffffff; border: 1px solid #e2e8f0; color: #4a5568; padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 0.875rem; transition: background 0.15s, color 0.15s; }
 .pagination button:hover:not(:disabled) { background: #edf2f7; color: #1a202c; }
 .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Pulse ──────────────────────────────────────────────── */
-.pulse {
-  color: #3182ce;
-  animation: pulse 1.2s ease-in-out infinite;
-}
+.pulse { color: #16a34a; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Vehicles section ───────────────────────────────────── */
+.vehicles-section { padding: 2rem; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.section-title { font-size: 1.1rem; font-weight: 600; color: #4a5568; letter-spacing: 0.04em; }
+
+.empty-state { text-align: center; padding: 3rem; color: #718096; background: #fff; border-radius: 12px; border: 1px dashed #e2e8f0; }
+
+.vehicles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+
+.vehicle-card {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06); display: flex; flex-direction: column;
+  transition: box-shadow 0.15s;
+}
+.vehicle-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.vehicle-card__img-wrap { width: 100%; height: 160px; background: #f7fafc; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.vehicle-card__img { width: 100%; height: 100%; object-fit: cover; }
+.vehicle-card__no-img { font-size: 3rem; }
+.vehicle-card__body { padding: 1rem; flex: 1; }
+.vehicle-card__name { font-weight: 700; font-size: 1rem; color: #1a202c; margin-bottom: 0.4rem; }
+.vehicle-card__rfid { font-size: 0.78rem; }
+.vehicle-card__rfid--none { color: #a0aec0; }
+.badge-rfid { display: inline-block; background: #f0fdf4; color: #15803d; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600; font-family: monospace; }
+.vehicle-card__actions { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid #f0f4f8; }
+
+/* ── Buttons ────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem;
+  border: none; border-radius: 8px; cursor: pointer; font-size: 0.875rem; font-weight: 500;
+  padding: 8px 16px; transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn--sm { padding: 5px 12px; font-size: 0.8rem; border-radius: 6px; }
+.btn--primary { background: #16a34a; color: #fff; }
+.btn--primary:hover:not(:disabled) { background: #15803d; }
+.btn--ghost { background: #edf2f7; color: #4a5568; border: 1px solid #e2e8f0; }
+.btn--ghost:hover:not(:disabled) { background: #e2e8f0; color: #1a202c; }
+.btn--danger { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+.btn--danger:hover:not(:disabled) { background: #fed7d7; }
+
+/* ── Modal ──────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1rem; }
+.modal { background: #ffffff; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
+.modal__header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0; }
+.modal__title { font-size: 1.1rem; font-weight: 700; color: #1a202c; }
+.modal__close { background: none; border: none; font-size: 1rem; cursor: pointer; color: #718096; padding: 4px; border-radius: 4px; }
+.modal__close:hover { color: #1a202c; background: #edf2f7; }
+.modal__body { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem; }
+.modal__footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem; border-top: 1px solid #e2e8f0; }
+
+/* ── Form ───────────────────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.form-label { font-size: 0.8rem; font-weight: 600; color: #4a5568; }
+.required { color: #e53e3e; }
+.form-input { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; color: #1a202c; background: #fff; outline: none; transition: border-color 0.15s; }
+.form-input:focus { border-color: #16a34a; }
+.form-hint { font-size: 0.75rem; color: #a0aec0; }
+.image-upload { display: flex; flex-direction: column; gap: 0.75rem; }
+.image-preview { width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid #e2e8f0; background: #f7fafc; }
+.image-placeholder { height: 120px; display: flex; align-items: center; justify-content: center; background: #f7fafc; border: 1px dashed #e2e8f0; border-radius: 8px; color: #a0aec0; font-size: 0.875rem; }
+.image-upload__btns { display: flex; gap: 0.5rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
