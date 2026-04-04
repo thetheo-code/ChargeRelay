@@ -28,8 +28,6 @@ services:
 
   frontend:
     build: ./frontend
-    ports:
-      - "3000:80"
     depends_on:
       - ocpp-api
     restart: unless-stopped
