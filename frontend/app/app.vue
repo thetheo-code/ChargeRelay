@@ -74,7 +74,7 @@
               </div>
               <div class="metric metric--date">
                 <div class="metric__label">Gestartet</div>
-                <div class="metric__value metric__value--date">{{ formatTime(s.start_time) }}</div>
+                <div class="metric__value">{{ formatTime(s.start_time) }}</div>
               </div>
             </div>
 
