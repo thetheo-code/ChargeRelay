@@ -7,8 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY server.py api.py ./
 
-VOLUME ["/data"]
-
 EXPOSE 9000
 
 CMD ["python", "-u", "server.py"]
