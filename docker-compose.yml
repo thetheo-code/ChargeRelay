@@ -1,0 +1,9 @@
+services:
+  ocpp-server:
+    build: .
+    container_name: ocpp-server
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
