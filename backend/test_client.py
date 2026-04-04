@@ -13,6 +13,7 @@ Ablauf:
 """
 import asyncio
 import logging
+import ssl
 from datetime import datetime, timezone
 
 import websockets
@@ -36,10 +37,11 @@ logger = logging.getLogger("test-client")
 # ---------------------------------------------------------------------------
 # Einstellungen
 # ---------------------------------------------------------------------------
-SERVER_HOST   = "localhost"
-SERVER_PORT   = 9000                # Traefik TLS-Termination → wss://
+SERVER_HOST   = "ocpp.zick13.com"
+SERVER_PORT   = 443                # Traefik TLS-Termination → wss://
+USE_SSL       = True                # True → wss://, False → ws://
 CP_ID         = "TEST-CP-001"
-ID_TAG        = "Hkjskadj"
+ID_TAG        = "RFID-DEMO-0001"
 CONNECTOR_ID  = 1
 METER_INTERVAL_SEC = 5             # Sekunden zwischen Messwerten
 
@@ -159,12 +161,20 @@ class TestChargePoint(CP):
 # Einstiegspunkt
 # ---------------------------------------------------------------------------
 async def main():
-    url = f"ws://{SERVER_HOST}:{SERVER_PORT}/ocpp/{CP_ID}"
+    scheme = "wss" if USE_SSL else "ws"
+    url = f"{scheme}://{SERVER_HOST}:{SERVER_PORT}/ocpp/{CP_ID}"
     logger.info("Verbinde mit %s …", url)
+
+    ssl_context = None
+    if USE_SSL:
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
 
     async with websockets.connect(
         url,
         subprotocols=["ocpp1.6"],
+        ssl=ssl_context,
     ) as ws:
         logger.info("Verbunden!")
         cp = TestChargePoint(CP_ID, ws)

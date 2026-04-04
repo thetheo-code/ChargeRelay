@@ -215,7 +215,7 @@
           </div>
           <div class="form-group">
             <label class="form-label">Name <span class="required">*</span></label>
-            <input v-model="vehicleForm.name" class="form-input" placeholder="z.B. Tesla Model 3" type="text">
+            <input v-model="vehicleForm.name" class="form-input" placeholder="z.B. ID 3" type="text">
           </div>
           <div class="form-group">
             <label class="form-label">RFID-Tag</label>
@@ -465,7 +465,7 @@ onMounted(async () => {
   await fetchVehicles()
   await refresh()
 })
-const interval = setInterval(refresh, 10_000)
+const interval = setInterval(refresh, 90_000)
 onUnmounted(() => clearInterval(interval))
 </script>
 
