@@ -2,3 +2,15 @@ services:
   ocpp-server:
     ports:
       - "9000:9000"
+    environment:
+      - DB_NAME=ocpp
+      - DB_USER=ocpp
+      - DB_PASSWORD=ocpp
+
+  ocpp-api:
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_NAME=ocpp
+      - DB_USER=ocpp
+      - DB_PASSWORD=ocpp

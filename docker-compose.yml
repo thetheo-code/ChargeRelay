@@ -1,15 +1,12 @@
 services:
   ocpp-server:
     build: .
-    container_name: ocpp-server
-    ports:
-      - "9000:9000"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=ocpp
-      - DB_USER=ocpp
-      - DB_PASSWORD=ocpp
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -17,16 +14,13 @@ services:
 
   ocpp-api:
     build: .
-    container_name: ocpp-api
     command: uvicorn api:app --host 0.0.0.0 --port 8000
-    ports:
-      - "8000:8000"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=ocpp
-      - DB_USER=ocpp
-      - DB_PASSWORD=ocpp
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,15 +28,14 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: ocpp-postgres
     environment:
-      POSTGRES_DB: ocpp
-      POSTGRES_USER: ocpp
-      POSTGRES_PASSWORD: ocpp
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ocpp -d ocpp"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 10
