@@ -6,6 +6,8 @@ services:
       - DB_NAME=ocpp
       - DB_USER=ocpp
       - DB_PASSWORD=ocpp
+    networks:
+      - dokploy-network
 
   ocpp-api:
     ports:
@@ -14,3 +16,13 @@ services:
       - DB_NAME=ocpp
       - DB_USER=ocpp
       - DB_PASSWORD=ocpp
+    networks:
+      - dokploy-network
+
+  postgres:
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: false
