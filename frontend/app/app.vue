@@ -235,7 +235,7 @@
 </template>
 
 <script setup lang="ts">
-const API = 'http://localhost:8000'
+const API = ''
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
