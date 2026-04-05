@@ -46,3 +46,28 @@ export interface Session {
   vehicle_id: number | null
   vehicle_name: string | null
 }
+
+export interface ReportDelivery {
+  id: number
+  type: 'mail' | 'ocpp'
+  email: string | null
+  interval: 'daily' | 'weekly' | 'monthly' | 'yearly' | null
+  address: string | null
+  port: number | null
+}
+
+export interface Report {
+  id: number
+  name: string
+  created_at: string
+  vehicles: { id: number; name: string }[]
+  deliveries: ReportDelivery[]
+}
+
+export interface Stats {
+  days: number
+  energy_per_day: { date: string; kwh: number }[]
+  energy_per_vehicle: { name: string; kwh: number }[]
+  total_sessions: number
+  total_kwh: number
+}

@@ -9,7 +9,7 @@
 
     <!-- Leer-Zustand -->
     <div v-else-if="vehicles.length === 0" class="empty-state">
-      <div class="empty-state__icon">🚗</div>
+      <div class="empty-state__icon">—</div>
       <div class="empty-state__text">Noch keine Fahrzeuge registriert.</div>
       <button class="btn btn--primary" @click="$emit('openNew')">Jetzt anlegen</button>
     </div>
@@ -19,7 +19,7 @@
       <div v-for="v in vehicles" :key="v.id" class="vehicle-card">
         <div class="vehicle-card__img-wrap">
           <img v-if="v.image_data" :src="v.image_data" class="vehicle-card__img" alt="">
-          <div v-else class="vehicle-card__no-img">🚗</div>
+          <div v-else class="vehicle-card__no-img">–</div>
         </div>
         <div class="vehicle-card__body">
           <div class="vehicle-card__name">{{ v.name }}</div>

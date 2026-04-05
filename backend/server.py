@@ -106,6 +106,31 @@ def init_db():
         cur.execute("""
             ALTER TABLE sessions ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id)
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS reports (
+                id          SERIAL PRIMARY KEY,
+                name        TEXT NOT NULL,
+                created_at  TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS report_vehicles (
+                report_id   INTEGER NOT NULL REFERENCES reports(id)  ON DELETE CASCADE,
+                vehicle_id  INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+                PRIMARY KEY (report_id, vehicle_id)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS report_deliveries (
+                id          SERIAL PRIMARY KEY,
+                report_id   INTEGER NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+                type        TEXT    NOT NULL,
+                email       TEXT,
+                interval    TEXT,
+                address     TEXT,
+                port        INTEGER
+            )
+        """)
     logger.info("Database initialised")
 
 

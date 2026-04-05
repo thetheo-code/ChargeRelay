@@ -64,7 +64,7 @@
             class="vehicle-hero__img"
             alt=""
           >
-          <div v-else class="vehicle-hero__placeholder">🚗</div>
+          <div v-else class="vehicle-hero__placeholder">–</div>
         </div>
         <div class="vehicle-hero__name">
           {{ session.vehicle_name }}
@@ -72,7 +72,7 @@
             v-if="getVehicle(session.vehicle_id)?.id_tag === session.id_tag"
             class="rfid-check"
             title="Automatisch per RFID erkannt"
-          >✓</span>
+          >✔</span>
         </div>
       </div>
 

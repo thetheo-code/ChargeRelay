@@ -6,7 +6,9 @@
       :loading="loading"
       @update:activeTab="activeTab = $event"
       @refresh="refresh"
+      @toSessions="switchToSessions"
       @toVehicles="switchToVehicles"
+      @toReports="switchToReports"
     />
 
     <!-- ── Übersicht ───────────────────────────────────────────────────── -->
@@ -19,12 +21,18 @@
         @updateSelection="sessionVehicleSelection[$event.sessionId] = $event.vehicleId"
         @assignVehicle="assignVehicle"
       />
+      <OverviewCharts :loading="statsLoading" :stats="stats" :error="statsError" />
+    </template>
+
+    <!-- ── Ladevorgänge ───────────────────────────────────────────────── -->
+    <template v-if="activeTab === 'sessions'">
       <SessionHistory
         :loading="historyLoading"
         :sessions="sessions"
         :page="page"
         :totalPages="totalPages"
         @changePage="changePage"
+        @editSession="openSessionEdit"
       />
     </template>
 
@@ -39,6 +47,17 @@
       />
     </template>
 
+    <!-- ── Reports ───────────────────────────────────────────────────── -->
+    <template v-if="activeTab === 'reports'">
+      <ReportsSection
+        :loading="reportsLoading"
+        :reports="reports"
+        @openNew="openNewReportForm"
+        @openEdit="openEditReportForm"
+        @confirmDelete="confirmDeleteReport"
+      />
+    </template>
+
     <!-- ── Fahrzeug-Formular (Modal) ───────────────────────────────────── -->
     <VehicleFormModal
       v-if="showVehicleForm"
@@ -48,17 +67,38 @@
       @save="saveVehicle"
     />
 
+    <!-- ── Report-Formular (Modal) ───────────────────────────────────── -->
+    <ReportFormModal
+      v-if="showReportForm"
+      :editingReport="editingReport"
+      :vehicles="vehicles"
+      :saving="savingReport"
+      @close="showReportForm = false"
+      @save="saveReport"
+    />
+
+    <!-- ── Ladung bearbeiten (Modal) ──────────────────────────────────── -->
+    <SessionEditModal
+      v-if="showSessionEdit && editingSession"
+      :session="editingSession"
+      :vehicles="vehicles"
+      :saving="savingSession"
+      @close="showSessionEdit = false"
+      @save="saveSessionEdit"
+      @delete="deleteSession"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Vehicle, ActiveSession, Session } from '~/types'
+import type { Vehicle, ActiveSession, Session, Report, Stats } from '~/types'
 
 const API = ''
 
 // ── State ──────────────────────────────────────────────────────────────────
 
-const activeTab = ref<'overview' | 'vehicles'>('overview')
+const activeTab = ref<'overview' | 'sessions' | 'vehicles' | 'reports'>('overview')
 
 const activeSessions = ref<ActiveSession[]>([])
 const activeLoading = ref(true)
@@ -75,6 +115,20 @@ const showVehicleForm = ref(false)
 const savingVehicle = ref(false)
 const editingVehicle = ref<Vehicle | null>(null)
 
+const reports = ref<Report[]>([])
+const reportsLoading = ref(false)
+const showReportForm = ref(false)
+const savingReport = ref(false)
+const editingReport = ref<Report | null>(null)
+
+const stats = ref<Stats | null>(null)
+const statsLoading = ref(true)   // true = zeigt Loading-Zustand beim ersten Rendern
+const statsError = ref(false)
+
+const showSessionEdit = ref(false)
+const editingSession = ref<Session | null>(null)
+const savingSession = ref(false)
+
 const sessionVehicleSelection = ref<Record<number, number | null>>({})
 
 // ── Hilfsfunktionen ────────────────────────────────────────────────────────
@@ -88,6 +142,28 @@ function initSessionSelections() {
 }
 
 // ── Datenabruf ─────────────────────────────────────────────────────────────
+
+async function fetchReports() {
+  reportsLoading.value = true
+  try {
+    reports.value = await $fetch<Report[]>(`${API}/api/reports`)
+  } catch { reports.value = [] }
+  finally { reportsLoading.value = false }
+}
+
+async function fetchStats() {
+  statsLoading.value = true
+  statsError.value = false
+  try {
+    stats.value = await $fetch<Stats>(`${API}/api/stats`)
+  } catch (e) {
+    console.error('fetchStats failed:', e)
+    statsError.value = true
+    stats.value = null
+  } finally {
+    statsLoading.value = false
+  }
+}
 
 async function fetchVehicles() {
   vehiclesLoading.value = true
@@ -121,7 +197,7 @@ async function fetchSessions() {
 
 async function refresh() {
   loading.value = true
-  await Promise.all([fetchActive(), fetchSessions()])
+  await Promise.all([fetchActive(), fetchSessions(), fetchStats()])
   loading.value = false
 }
 
@@ -130,9 +206,19 @@ async function changePage(p: number) {
   await fetchSessions()
 }
 
+async function switchToSessions() {
+  activeTab.value = 'sessions'
+  await fetchSessions()
+}
+
 async function switchToVehicles() {
   activeTab.value = 'vehicles'
   await fetchVehicles()
+}
+
+async function switchToReports() {
+  activeTab.value = 'reports'
+  await Promise.all([fetchReports(), fetchVehicles()])
 }
 
 // ── Fahrzeug-CRUD ──────────────────────────────────────────────────────────
@@ -171,6 +257,89 @@ async function confirmDeleteVehicle(v: Vehicle) {
     await fetchVehicles()
   } catch {
     alert('Fehler beim Löschen.')
+  }
+}
+
+// ── Report-CRUD ────────────────────────────────────────────────────────────
+
+function openNewReportForm() {
+  editingReport.value = null
+  showReportForm.value = true
+}
+
+function openEditReportForm(r: Report) {
+  editingReport.value = r
+  showReportForm.value = true
+}
+
+async function saveReport(body: {
+  name: string
+  vehicle_ids: number[]
+  deliveries: { type: string; email: string | null; interval: string | null; address: string | null; port: number | null }[]
+}) {
+  savingReport.value = true
+  try {
+    if (editingReport.value) {
+      await $fetch(`${API}/api/reports/${editingReport.value.id}`, { method: 'PUT', body })
+    } else {
+      await $fetch(`${API}/api/reports`, { method: 'POST', body })
+    }
+    showReportForm.value = false
+    await fetchReports()
+  } catch {
+    alert('Fehler beim Speichern.')
+  } finally {
+    savingReport.value = false
+  }
+}
+
+async function confirmDeleteReport(r: Report) {
+  if (!confirm(`Report „${r.name}" wirklich löschen?`)) return
+  try {
+    await $fetch(`${API}/api/reports/${r.id}`, { method: 'DELETE' })
+    await fetchReports()
+  } catch {
+    alert('Fehler beim Löschen.')
+  }
+}
+
+// ── Session bearbeiten (Fahrzeug ändern / entfernen) ──────────────────────
+
+function openSessionEdit(s: Session) {
+  editingSession.value = s
+  showSessionEdit.value = true
+}
+
+async function saveSessionEdit({ vehicleId }: { vehicleId: number | null }) {
+  if (!editingSession.value) return
+  savingSession.value = true
+  try {
+    await $fetch(`${API}/api/sessions/${editingSession.value.session_id}/vehicle`, {
+      method: 'PUT',
+      body: { vehicle_id: vehicleId },
+    })
+    showSessionEdit.value = false
+    await fetchSessions()
+  } catch {
+    alert('Fehler beim Speichern.')
+  } finally {
+    savingSession.value = false
+  }
+}
+
+async function deleteSession() {
+  if (!editingSession.value) return
+  savingSession.value = true
+  try {
+    await $fetch(`${API}/api/sessions/${editingSession.value.session_id}`, {
+      method: 'DELETE',
+    })
+    showSessionEdit.value = false
+    await fetchSessions()
+  } catch {
+    alert('Fehler beim Löschen.')
+  } finally {
+    savingSession.value = false
   }
 }
 
@@ -318,7 +487,8 @@ body {
   width: 100%;
 }
 .active-section,
-.history-section {
+.history-section,
+.vehicles-section {
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
@@ -841,7 +1011,7 @@ body {
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn--sm { padding: 5px 12px; font-size: 0.8rem; }
-.btn--primary { background: var(--accent); color: #000; font-weight: 700; }
+.btn--primary { background: var(--accent); color: #fff; font-weight: 700; }
 .btn--primary:hover:not(:disabled) { background: #4ade80; }
 .btn--ghost {
   background: var(--bg-card-2);

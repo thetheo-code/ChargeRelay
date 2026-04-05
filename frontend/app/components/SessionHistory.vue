@@ -19,6 +19,7 @@
               <th>Ende</th>
               <th>Energie</th>
               <th>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -45,6 +46,13 @@
                 <span v-if="!s.stop_time" class="status status--active">Aktiv</span>
                 <span v-else class="status status--done">Fertig</span>
               </td>
+              <td class="td-edit">
+                <button class="edit-btn" @click="$emit('editSession', s)" title="Bearbeiten">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11.06 1.06a1.5 1.5 0 0 1 2.12 0l1.76 1.76a1.5 1.5 0 0 1 0 2.12L5.5 14.38l-4.38.62.62-4.38L11.06 1.06Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -61,6 +69,11 @@
             <div class="scard__head-right">
               <span v-if="!s.stop_time" class="status status--active">Aktiv</span>
               <span v-else class="status status--done">Fertig</span>
+              <button class="edit-btn" @click="$emit('editSession', s)" title="Bearbeiten">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11.06 1.06a1.5 1.5 0 0 1 2.12 0l1.76 1.76a1.5 1.5 0 0 1 0 2.12L5.5 14.38l-4.38.62.62-4.38L11.06 1.06Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                </svg>
+              </button>
             </div>
           </div>
           <div class="scard__rows">
@@ -107,7 +120,37 @@ defineProps<{
   totalPages: number
 }>()
 
-defineEmits<{ changePage: [page: number] }>()
+defineEmits<{
+  changePage: [page: number]
+  editSession: [session: Session]
+}>()
 
 const { formatDate } = useFormatters()
 </script>
+
+<style scoped>
+.td-edit {
+  width: 36px;
+  text-align: right;
+  padding-right: 0.75rem !important;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.edit-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+</style>
