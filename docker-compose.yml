@@ -15,8 +15,7 @@ services:
     restart: unless-stopped
 
   ocpp-api:
-    build: ./backend
-    command: uvicorn api:app --host 0.0.0.0 --port 8000
+    build: ./api
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432

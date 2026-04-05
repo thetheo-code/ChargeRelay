@@ -1,329 +1,60 @@
 <template>
   <div class="app">
 
-    <!-- ── Topbar ──────────────────────────────────────────────────── -->
-    <header class="topbar">
-      <div class="topbar__inner">
-        <div class="topbar__brand">
-          <span class="topbar__title">Wallbox</span>
-        </div>
-        <nav class="topbar__nav">
-          <button class="tab-btn" :class="{ 'tab-btn--active': activeTab === 'overview' }" @click="activeTab = 'overview'">Übersicht</button>
-          <button class="tab-btn" :class="{ 'tab-btn--active': activeTab === 'vehicles' }" @click="switchToVehicles">Fahrzeuge</button>
-        </nav>
-        <button class="topbar__refresh" :class="{ spinning: loading }" @click="refresh" aria-label="Aktualisieren">↻</button>
-      </div>
-    </header>
+    <AppTopbar
+      :activeTab="activeTab"
+      :loading="loading"
+      @update:activeTab="activeTab = $event"
+      @refresh="refresh"
+      @toVehicles="switchToVehicles"
+    />
 
-    <!-- ── Übersicht ───────────────────────────────────────────────── -->
+    <!-- ── Übersicht ───────────────────────────────────────────────────── -->
     <template v-if="activeTab === 'overview'">
-      <section class="active-section">
-
-        <!-- Loading -->
-        <div v-if="activeLoading" class="state-card">
-          <div class="spinner"></div>
-          <span class="state-card__text">Verbinde…</span>
-        </div>
-
-        <!-- Idle -->
-        <div v-else-if="activeSessions.length === 0" class="state-card state-card--idle">
-          <div class="state-card__text">Kein aktiver Ladevorgang</div>
-          <div class="state-card__sub">Gerät wartet auf Verbindung</div>
-        </div>
-
-        <!-- Charging -->
-        <div v-else v-for="s in activeSessions" :key="s.session_id" class="charge-card">
-
-          <!-- Card head -->
-          <div class="charge-card__head">
-            <div class="live-dot"></div>
-            <span class="charge-card__live-label">Live</span>
-            <span class="charge-card__sep">·</span>
-            <span class="charge-card__cp">{{ s.model || s.charge_point_id }}</span>
-            <span class="badge">C{{ s.connector_id }}</span>
-          </div>
-
-          <!-- Card body -->
-          <div class="charge-card__body" :class="{ 'charge-card__body--with-vehicle': s.vehicle_id }">
-
-            <!-- Metrics -->
-            <div class="metrics-grid">
-              <div class="metric">
-                <div class="metric__label">Laufzeit</div>
-                <div class="metric__value">{{ formatDuration(s.duration_seconds) }}</div>
-              </div>
-              <div class="metric" v-if="getMeter(s, 'Energy.Active.Import.Register')">
-                <div class="metric__label">Energie</div>
-                <div class="metric__value metric__value--accent">{{ formatEnergy(getMeter(s, 'Energy.Active.Import.Register')) }}<span class="metric__unit">kWh</span></div>
-              </div>
-              <div class="metric" v-if="getMeter(s, 'Power.Active.Import')">
-                <div class="metric__label">Leistung</div>
-                <div class="metric__value">{{ formatPower(getMeter(s, 'Power.Active.Import')) }}<span class="metric__unit">kW</span></div>
-              </div>
-              <div class="metric" v-if="getMeter(s, 'SoC')">
-                <div class="metric__label">Ladestand</div>
-                <div class="metric__value metric__value--accent">{{ Number(getMeter(s, 'SoC')?.value).toFixed(0) }}<span class="metric__unit">%</span></div>
-              </div>
-              <div class="metric" v-if="getMeter(s, 'Current.Import')">
-                <div class="metric__label">Strom</div>
-                <div class="metric__value">{{ Number(getMeter(s, 'Current.Import')?.value).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}<span class="metric__unit">A</span></div>
-              </div>
-              <div class="metric" v-if="getMeter(s, 'Voltage')">
-                <div class="metric__label">Spannung</div>
-                <div class="metric__value">{{ Number(getMeter(s, 'Voltage')?.value).toFixed(0) }}<span class="metric__unit">V</span></div>
-              </div>
-              <div class="metric metric--date">
-                <div class="metric__label">Gestartet</div>
-                <div class="metric__value">{{ formatTime(s.start_time) }}</div>
-              </div>
-            </div>
-
-            <!-- Vehicle hero -->
-            <div v-if="s.vehicle_id" class="vehicle-hero">
-              <div class="vehicle-hero__img-wrap">
-                <img v-if="getVehicle(s.vehicle_id)?.image_data" :src="getVehicle(s.vehicle_id)?.image_data ?? ''" class="vehicle-hero__img" alt="">
-                <div v-else class="vehicle-hero__placeholder">🚗</div>
-              </div>
-              <div class="vehicle-hero__name">
-                {{ s.vehicle_name }}
-                <span v-if="getVehicle(s.vehicle_id)?.id_tag && getVehicle(s.vehicle_id)?.id_tag === s.id_tag" class="rfid-check" title="Automatisch per RFID erkannt">✓</span>
-              </div>
-            </div>
-
-            <!-- Assign vehicle -->
-            <div v-if="!s.vehicle_id" class="assign-block">
-              <div class="assign-block__label">Fahrzeug zuweisen</div>
-              <div class="vehicle-assign">
-                <select v-model="sessionVehicleSelection[s.session_id]" class="sel" :disabled="vehicles.length === 0">
-                  <option v-if="vehicles.length === 0" :value="null">Keine Fahrzeuge</option>
-                  <option v-for="v in vehicles" :key="v.id" :value="v.id">{{ v.name }}</option>
-                </select>
-                <button class="btn btn--sm btn--primary" @click="assignVehicle(s.session_id)" :disabled="!sessionVehicleSelection[s.session_id]">Zuweisen</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- SoC bar -->
-          <div v-if="getMeter(s, 'SoC')" class="soc-wrap">
-            <div class="soc-track">
-              <div class="soc-fill" :style="{ width: Number(getMeter(s, 'SoC')?.value) + '%' }"></div>
-            </div>
-            <span class="soc-label">{{ Number(getMeter(s, 'SoC')?.value).toFixed(0) }} %</span>
-          </div>
-
-          <!-- Animated charging bar -->
-          <div class="charge-anim">
-            <div class="charge-anim__track"><div class="charge-anim__fill"></div></div>
-            <span class="charge-anim__label">Laden aktiv</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- History -->
-      <section class="history-section">
-        <div class="section-header">
-          <h2 class="section-title">Letzte Ladevorgänge</h2>
-        </div>
-
-        <div v-if="historyLoading" class="loading-hint">Lade Verlauf …</div>
-
-        <template v-else>
-          <!-- Desktop table -->
-          <div class="table-wrap">
-            <table class="session-table">
-              <thead>
-                <tr>
-                  <th>Ladestation</th>
-                  <th>Fahrzeug / Ausweis</th>
-                  <th>Start</th>
-                  <th>Ende</th>
-                  <th>Energie</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="s in sessions" :key="s.session_id" :class="{ 'row--active': !s.stop_time }">
-                  <td>
-                    <span class="cp-name">{{ s.model || s.charge_point_id }}</span>
-                    <span class="connector-badge">C{{ s.connector_id }}</span>
-                  </td>
-                  <td>
-                    <div v-if="s.vehicle_name" class="cell-vehicle">
-                      <span class="cell-vehicle__name">{{ s.vehicle_name }}</span>
-                      <span class="cell-vehicle__tag mono">{{ s.id_tag }}</span>
-                    </div>
-                    <span v-else class="mono muted">{{ s.id_tag || '–' }}</span>
-                  </td>
-                  <td class="mono">{{ formatDate(s.start_time) }}</td>
-                  <td class="mono muted">{{ s.stop_time ? formatDate(s.stop_time) : '–' }}</td>
-                  <td class="mono energy">{{ s.energy_kwh != null ? s.energy_kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kWh' : '–' }}</td>
-                  <td>
-                    <span v-if="!s.stop_time" class="status status--active">Aktiv</span>
-                    <span v-else class="status status--done">Fertig</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Mobile cards -->
-          <div class="session-cards">
-            <div v-for="s in sessions" :key="s.session_id" class="scard" :class="{ 'scard--active': !s.stop_time }">
-              <div class="scard__head">
-                <div>
-                  <span class="cp-name">{{ s.model || s.charge_point_id }}</span>
-                  <span class="connector-badge">C{{ s.connector_id }}</span>
-                </div>
-                <div class="scard__head-right">
-                  <span v-if="!s.stop_time" class="status status--active">Aktiv</span>
-                  <span v-else class="status status--done">Fertig</span>
-                </div>
-              </div>
-              <div class="scard__rows">
-                <div class="scard__row">
-                  <span class="scard__key">Fahrzeug</span>
-                  <span v-if="s.vehicle_name" class="scard__val">{{ s.vehicle_name }}</span>
-                  <span v-else class="scard__val mono muted">{{ s.id_tag || '–' }}</span>
-                </div>
-                <div class="scard__row">
-                  <span class="scard__key">Start</span>
-                  <span class="scard__val mono">{{ formatDate(s.start_time) }}</span>
-                </div>
-                <div class="scard__row" v-if="s.stop_time">
-                  <span class="scard__key">Ende</span>
-                  <span class="scard__val mono">{{ formatDate(s.stop_time) }}</span>
-                </div>
-                <div class="scard__row" v-if="s.energy_kwh != null">
-                  <span class="scard__key">Energie</span>
-                  <span class="scard__val energy mono">{{ s.energy_kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} kWh</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <div class="pagination">
-          <button :disabled="page <= 1" @click="changePage(page - 1)">‹ Zurück</button>
-          <span class="pagination__info">Seite {{ page }} / {{ totalPages }}</span>
-          <button :disabled="page >= totalPages" @click="changePage(page + 1)">Weiter ›</button>
-        </div>
-      </section>
+      <ActiveSection
+        :loading="activeLoading"
+        :sessions="activeSessions"
+        :vehicles="vehicles"
+        :sessionVehicleSelection="sessionVehicleSelection"
+        @updateSelection="sessionVehicleSelection[$event.sessionId] = $event.vehicleId"
+        @assignVehicle="assignVehicle"
+      />
+      <SessionHistory
+        :loading="historyLoading"
+        :sessions="sessions"
+        :page="page"
+        :totalPages="totalPages"
+        @changePage="changePage"
+      />
     </template>
 
-    <!-- ── Fahrzeuge ───────────────────────────────────────────────── -->
+    <!-- ── Fahrzeuge ───────────────────────────────────────────────────── -->
     <template v-if="activeTab === 'vehicles'">
-      <section class="vehicles-section">
-        <div class="section-header">
-          <h2 class="section-title">Fahrzeuge</h2>
-          <button class="btn btn--primary" @click="openNewVehicleForm">+ Neues Fahrzeug</button>
-        </div>
-
-        <div v-if="vehiclesLoading" class="loading-hint">Lade Fahrzeuge …</div>
-
-        <div v-else-if="vehicles.length === 0" class="empty-state">
-          <div class="empty-state__icon">🚗</div>
-          <div class="empty-state__text">Noch keine Fahrzeuge registriert.</div>
-          <button class="btn btn--primary" @click="openNewVehicleForm">Jetzt anlegen</button>
-        </div>
-
-        <div v-else class="vehicles-grid">
-          <div v-for="v in vehicles" :key="v.id" class="vehicle-card">
-            <div class="vehicle-card__img-wrap">
-              <img v-if="v.image_data" :src="v.image_data" class="vehicle-card__img" alt="">
-              <div v-else class="vehicle-card__no-img">🚗</div>
-            </div>
-            <div class="vehicle-card__body">
-              <div class="vehicle-card__name">{{ v.name }}</div>
-              <div v-if="v.id_tag" class="vehicle-card__rfid">
-                <span class="badge-rfid">{{ v.id_tag }}</span>
-              </div>
-              <div v-else class="vehicle-card__rfid vehicle-card__rfid--none">Kein RFID-Tag</div>
-            </div>
-            <div class="vehicle-card__actions">
-              <button class="btn btn--sm btn--ghost" @click="openEditVehicleForm(v)">Bearbeiten</button>
-              <button class="btn btn--sm btn--danger" @click="confirmDeleteVehicle(v)">Löschen</button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <VehiclesSection
+        :loading="vehiclesLoading"
+        :vehicles="vehicles"
+        @openNew="openNewVehicleForm"
+        @openEdit="openEditVehicleForm"
+        @confirmDelete="confirmDeleteVehicle"
+      />
     </template>
 
-    <!-- ── Vehicle Form Modal ─────────────────────────────────────── -->
-    <div class="modal-overlay" v-if="showVehicleForm" @click.self="showVehicleForm = false">
-      <div class="modal">
-        <div class="modal__header">
-          <h3 class="modal__title">{{ editingVehicle ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug' }}</h3>
-          <button class="modal__close" @click="showVehicleForm = false">✕</button>
-        </div>
-        <div class="modal__body">
-          <div class="form-group">
-            <label class="form-label">Bild</label>
-            <div class="image-upload">
-              <img v-if="vehicleForm.image_data" :src="vehicleForm.image_data" class="image-preview" alt="">
-              <div v-else class="image-placeholder">Kein Bild ausgewählt</div>
-              <div class="image-upload__btns">
-                <label class="btn btn--ghost btn--sm">
-                  Bild wählen
-                  <input type="file" accept="image/*" class="sr-only" @change="handleImageUpload">
-                </label>
-                <button v-if="vehicleForm.image_data" class="btn btn--ghost btn--sm" @click="vehicleForm.image_data = null">Entfernen</button>
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Name <span class="required">*</span></label>
-            <input v-model="vehicleForm.name" class="form-input" placeholder="z.B. ID 3" type="text">
-          </div>
-          <div class="form-group">
-            <label class="form-label">RFID-Tag</label>
-            <input v-model="vehicleForm.id_tag" class="form-input mono" placeholder="z.B. RFID-0001" type="text">
-            <div class="form-hint">Wird beim Laden per RFID automatisch erkannt und zugewiesen</div>
-          </div>
-        </div>
-        <div class="modal__footer">
-          <button class="btn btn--ghost" @click="showVehicleForm = false">Abbrechen</button>
-          <button class="btn btn--primary" @click="saveVehicle" :disabled="!vehicleForm.name.trim() || savingVehicle">
-            {{ savingVehicle ? 'Speichern …' : 'Speichern' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
+    <!-- ── Fahrzeug-Formular (Modal) ───────────────────────────────────── -->
+    <VehicleFormModal
+      v-if="showVehicleForm"
+      :editingVehicle="editingVehicle"
+      :saving="savingVehicle"
+      @close="showVehicleForm = false"
+      @save="saveVehicle"
+    />
 
   </div>
 </template>
 
 <script setup lang="ts">
+import type { Vehicle, ActiveSession, Session } from '~/types'
+
 const API = ''
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface Vehicle {
-  id: number
-  name: string
-  id_tag: string | null
-  image_data: string | null
-  created_at: string
-}
-
-interface MeterValue { measurand: string; value: string; unit: string; timestamp: string }
-
-interface ActiveSession {
-  session_id: number; connector_id: number; transaction_id: number | null
-  id_tag: string; start_time: string; start_meter_wh: number | null
-  charge_point_id: string; model: string | null; vendor: string | null
-  duration_seconds: number | null; latest_meter_values: MeterValue[]
-  vehicle_id: number | null; vehicle_name: string | null
-}
-
-interface Session {
-  session_id: number; connector_id: number; transaction_id: number | null
-  id_tag: string; start_time: string; stop_time: string | null
-  start_meter_wh: number | null; stop_meter_wh: number | null
-  energy_kwh: number | null; stop_reason: string | null
-  charge_point_id: string; model: string | null; vendor: string | null
-  vehicle_id: number | null; vehicle_name: string | null
-}
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -343,17 +74,10 @@ const vehiclesLoading = ref(false)
 const showVehicleForm = ref(false)
 const savingVehicle = ref(false)
 const editingVehicle = ref<Vehicle | null>(null)
-const vehicleForm = ref({ name: '', id_tag: '', image_data: null as string | null })
-
 
 const sessionVehicleSelection = ref<Record<number, number | null>>({})
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function getVehicle(id: number | null): Vehicle | undefined {
-  if (id === null) return undefined
-  return vehicles.value.find(v => v.id === id)
-}
+// ── Hilfsfunktionen ────────────────────────────────────────────────────────
 
 function initSessionSelections() {
   for (const s of activeSessions.value) {
@@ -363,7 +87,7 @@ function initSessionSelections() {
   }
 }
 
-// ── Data fetching ──────────────────────────────────────────────────────────
+// ── Datenabruf ─────────────────────────────────────────────────────────────
 
 async function fetchVehicles() {
   vehiclesLoading.value = true
@@ -377,8 +101,7 @@ async function fetchVehicles() {
 async function fetchActive() {
   activeLoading.value = true
   try {
-    const data = await $fetch<ActiveSession[]>(`${API}/api/active`)
-    activeSessions.value = data
+    activeSessions.value = await $fetch<ActiveSession[]>(`${API}/api/active`)
     initSessionSelections()
   } catch { activeSessions.value = [] }
   finally { activeLoading.value = false }
@@ -412,38 +135,21 @@ async function switchToVehicles() {
   await fetchVehicles()
 }
 
-
-// ── Vehicle CRUD ─────────────────────────────────────────────────────────────
+// ── Fahrzeug-CRUD ──────────────────────────────────────────────────────────
 
 function openNewVehicleForm() {
   editingVehicle.value = null
-  vehicleForm.value = { name: '', id_tag: '', image_data: null }
   showVehicleForm.value = true
 }
 
 function openEditVehicleForm(v: Vehicle) {
   editingVehicle.value = v
-  vehicleForm.value = { name: v.name, id_tag: v.id_tag || '', image_data: v.image_data }
   showVehicleForm.value = true
 }
 
-function handleImageUpload(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = (e) => { vehicleForm.value.image_data = e.target?.result as string }
-  reader.readAsDataURL(file)
-}
-
-async function saveVehicle() {
-  if (!vehicleForm.value.name.trim()) return
+async function saveVehicle(body: { name: string; id_tag: string | null; image_data: string | null }) {
   savingVehicle.value = true
   try {
-    const body = {
-      name: vehicleForm.value.name.trim(),
-      id_tag: vehicleForm.value.id_tag.trim() || null,
-      image_data: vehicleForm.value.image_data,
-    }
     if (editingVehicle.value) {
       await $fetch(`${API}/api/vehicles/${editingVehicle.value.id}`, { method: 'PUT', body })
     } else {
@@ -468,7 +174,7 @@ async function confirmDeleteVehicle(v: Vehicle) {
   }
 }
 
-// ── Session vehicle assignment ─────────────────────────────────────────────
+// ── Fahrzeug einer Session zuweisen ────────────────────────────────────────
 
 async function assignVehicle(session_id: number) {
   const vehicle_id = sessionVehicleSelection.value[session_id]
@@ -482,46 +188,6 @@ async function assignVehicle(session_id: number) {
   } catch {
     alert('Fehler beim Zuweisen des Fahrzeugs.')
   }
-}
-
-// ── Formatters ─────────────────────────────────────────────────────────────
-
-function getMeter(s: ActiveSession, measurand: string) {
-  return s.latest_meter_values.find(m => m.measurand === measurand) ?? null
-}
-
-function formatDuration(secs: number | null) {
-  if (secs == null) return '–'
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  const s = secs % 60
-  if (h > 0) return `${h}h ${m}m`
-  if (m > 0) return `${m}m ${s}s`
-  return `${s}s`
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return '–'
-  return new Date(iso).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
-}
-
-function formatTime(iso: string | null) {
-  if (!iso) return '–'
-  return new Date(iso).toLocaleString('de-DE', { timeStyle: 'short' })
-}
-
-function formatEnergy(m: MeterValue | null) {
-  if (!m) return '–'
-  const v = Number(m.value)
-  const kwh = (m.unit === 'Wh' || v > 1000) ? v / 1000 : v
-  return kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function formatPower(m: MeterValue | null) {
-  if (!m) return '–'
-  const v = Number(m.value)
-  const kw = m.unit === 'W' ? v / 1000 : v
-  return kw.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────
