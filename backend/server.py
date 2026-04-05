@@ -20,6 +20,9 @@ from ocpp.v16.enums import (
     RegistrationStatus,
 )
 
+from ocpp_forwarder import OcppForwarder
+from report_mailer import ReportMailer
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -131,7 +134,18 @@ def init_db():
                 port        INTEGER
             )
         """)
+        # Migration: add last_sent column if it doesn't exist yet
+        cur.execute("""
+            ALTER TABLE report_deliveries ADD COLUMN IF NOT EXISTS last_sent TEXT
+        """)
     logger.info("Database initialised")
+
+
+# ---------------------------------------------------------------------------
+# Global services (initialised in main())
+# ---------------------------------------------------------------------------
+
+forwarder: OcppForwarder | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +159,14 @@ class ChargePoint(CP):
         self._cp_id = cp_id
         # Maps connector_id -> pending session row id
         self._active_sessions: dict[int, int] = {}
+
+    # --- Message forwarding -------------------------------------------------
+
+    async def route_message(self, raw_msg):
+        """Intercept every incoming OCPP frame and forward it to relay targets."""
+        if forwarder is not None:
+            asyncio.ensure_future(forwarder.forward(self._cp_id, raw_msg))
+        return await super().route_message(raw_msg)
 
     # --- BootNotification ---------------------------------------------------
 
@@ -341,7 +363,17 @@ async def on_connect(websocket, path):
 
 
 async def main():
+    global forwarder
+
     init_db()
+
+    # Initialise OCPP forwarder
+    forwarder = OcppForwarder(DSN)
+
+    # Start e-mail report scheduler as background task
+    mailer = ReportMailer(DSN)
+    asyncio.create_task(mailer.run())
+
     host = "0.0.0.0"
     port = 9000
     logger.info("OCPP 1.6 server listening on ws://%s:%d", host, port)
