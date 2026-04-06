@@ -48,7 +48,13 @@
     "edit": "Edit",
     "prev": "‹ Previous",
     "next": "Next ›",
-    "page": "Page {page} / {total}"
+    "page": "Page {page} / {total}",
+    "csvFrom": "From",
+    "csvTo": "To",
+    "csvVehicles": "Vehicles",
+    "csvAllVehicles": "All",
+    "csvDownloadBtn": "Download",
+    "csvDownloading": "Preparing …"
   },
   "sessionEdit": {
     "title": "Edit Session",

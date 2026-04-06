@@ -48,7 +48,13 @@
     "edit": "Bearbeiten",
     "prev": "‹ Zurück",
     "next": "Weiter ›",
-    "page": "Seite {page} / {total}"
+    "page": "Seite {page} / {total}",
+    "csvFrom": "Von",
+    "csvTo": "Bis",
+    "csvVehicles": "Fahrzeuge",
+    "csvAllVehicles": "Alle",
+    "csvDownloadBtn": "Herunterladen",
+    "csvDownloading": "Wird erstellt …"
   },
   "sessionEdit": {
     "title": "Ladung bearbeiten",

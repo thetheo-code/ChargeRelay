@@ -38,6 +38,7 @@
       <SessionHistory
         :loading="historyLoading"
         :sessions="sessions"
+        :vehicles="vehicles"
         :page="page"
         :totalPages="totalPages"
         @changePage="changePage"
