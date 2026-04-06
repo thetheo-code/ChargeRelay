@@ -1,0 +1,22 @@
+services:
+  ocpp-server:
+    networks:
+      - dokploy-network
+
+  ocpp-api:
+    networks:
+      - dokploy-network
+
+  frontend:
+    networks:
+      - dokploy-network
+
+  postgres:
+    networks:
+      - dokploy-network
+
+networks:
+  chargerelay:
+    driver: bridge
+  dokploy-network:
+    external: true

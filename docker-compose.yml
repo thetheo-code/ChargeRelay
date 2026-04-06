@@ -2,23 +2,27 @@ services:
   ocpp-server:
     build: ./backend
     env_file: .env
+    ports:
+      - "9000:9000"
     depends_on:
       postgres:
         condition: service_healthy
         required: false
     networks:
-      - dokploy-network
+      - chargerelay
     restart: unless-stopped
 
   ocpp-api:
     build: ./api
     env_file: .env
+    ports:
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
         required: false
     networks:
-      - dokploy-network
+      - chargerelay
     restart: unless-stopped
 
   frontend:
@@ -26,10 +30,12 @@ services:
       context: ./frontend
       args:
         - DEFAULT_LOCALE=${DEFAULT_LOCALE:-de}
+    ports:
+      - "3000:3000"
     depends_on:
       - ocpp-api
     networks:
-      - dokploy-network
+      - chargerelay
     restart: unless-stopped
 
   # Built-in Postgres – only starts when COMPOSE_PROFILES=local-db is set.
@@ -52,12 +58,12 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - dokploy-network
+      - chargerelay
     restart: unless-stopped
 
 volumes:
   postgres_data:
 
 networks:
-  dokploy-network:
-    external: true
+  chargerelay:
+    driver: bridge
