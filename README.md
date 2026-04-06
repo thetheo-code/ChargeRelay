@@ -143,19 +143,9 @@ docker compose up -d
 
 ### Dokploy
 
-ChargeRelay includes a dedicated Dokploy override that attaches all containers to the shared `dokploy-network`. In Dokploy's compose configuration, add the override file:
+Use the dedicated `docker-compose.dokploy.yml` — it is fully self-contained and attaches all containers to Dokploy's shared `dokploy-network`.
 
-```
-docker-compose.yml + docker-compose.dokploy.yml
-```
-
-Or in the Dokploy UI, set **Compose File** to:
-
-```
-docker-compose.yml
-```
-
-and **Additional Compose Files** to:
+In the Dokploy UI set **Compose File** to:
 
 ```
 docker-compose.dokploy.yml

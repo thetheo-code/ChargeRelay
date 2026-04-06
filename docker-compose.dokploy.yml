@@ -1,22 +1,60 @@
 services:
   ocpp-server:
+    build: ./backend
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     networks:
       - dokploy-network
+    restart: unless-stopped
 
   ocpp-api:
+    build: ./api
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     networks:
       - dokploy-network
+    restart: unless-stopped
 
   frontend:
+    build:
+      context: ./frontend
+      args:
+        - DEFAULT_LOCALE=${DEFAULT_LOCALE:-de}
+    depends_on:
+      - ocpp-api
     networks:
       - dokploy-network
+    restart: unless-stopped
 
   postgres:
+    profiles:
+      - local-db
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ocpp}
+      POSTGRES_USER: ${DB_USER:-ocpp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ocpp} -d ${DB_NAME:-ocpp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - dokploy-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
 
 networks:
-  chargerelay:
-    driver: bridge
   dokploy-network:
     external: true
