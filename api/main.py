@@ -8,7 +8,7 @@ Start with:  uvicorn main:app --host 0.0.0.0 --port 8000
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import reports, sessions, stats, vehicles
+from routers import auth, reports, sessions, stats, vehicles
 
 # ---------------------------------------------------------------------------
 # Application factory
@@ -33,6 +33,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 # Each router handles one domain of the API surface.
+app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(vehicles.router)
 app.include_router(stats.router)

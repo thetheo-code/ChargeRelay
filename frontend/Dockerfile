@@ -7,6 +7,11 @@ COPY package.json ./
 RUN npm install
 
 COPY . .
+
+# Accept default locale at build time so it gets embedded into the static bundle.
+ARG DEFAULT_LOCALE=de
+ENV DEFAULT_LOCALE=$DEFAULT_LOCALE
+
 RUN npm run generate
 
 # Production stage

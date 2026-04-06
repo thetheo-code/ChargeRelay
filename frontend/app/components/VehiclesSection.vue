@@ -1,20 +1,20 @@
 <template>
   <section class="vehicles-section">
     <div class="section-header">
-      <h2 class="section-title">Fahrzeuge</h2>
-      <button class="btn btn--primary" @click="$emit('openNew')">+ Neues Fahrzeug</button>
+      <h2 class="section-title">{{ t('vehicles.title') }}</h2>
+      <button class="btn btn--primary" @click="$emit('openNew')">{{ t('vehicles.new') }}</button>
     </div>
 
-    <div v-if="loading" class="loading-hint">Lade Fahrzeuge …</div>
+    <div v-if="loading" class="loading-hint">{{ t('vehicles.loading') }}</div>
 
-    <!-- Leer-Zustand -->
+    <!-- Empty state -->
     <div v-else-if="vehicles.length === 0" class="empty-state">
       <div class="empty-state__icon">—</div>
-      <div class="empty-state__text">Noch keine Fahrzeuge registriert.</div>
-      <button class="btn btn--primary" @click="$emit('openNew')">Jetzt anlegen</button>
+      <div class="empty-state__text">{{ t('vehicles.empty') }}</div>
+      <button class="btn btn--primary" @click="$emit('openNew')">{{ t('vehicles.create') }}</button>
     </div>
 
-    <!-- Fahrzeug-Raster -->
+    <!-- Vehicle grid -->
     <div v-else class="vehicles-grid">
       <div v-for="v in vehicles" :key="v.id" class="vehicle-card">
         <div class="vehicle-card__img-wrap">
@@ -26,11 +26,11 @@
           <div v-if="v.id_tag" class="vehicle-card__rfid">
             <span class="badge-rfid">{{ v.id_tag }}</span>
           </div>
-          <div v-else class="vehicle-card__rfid vehicle-card__rfid--none">Kein RFID-Tag</div>
+          <div v-else class="vehicle-card__rfid vehicle-card__rfid--none">{{ t('vehicles.noRfid') }}</div>
         </div>
         <div class="vehicle-card__actions">
-          <button class="btn btn--sm btn--ghost" @click="$emit('openEdit', v)">Bearbeiten</button>
-          <button class="btn btn--sm btn--danger" @click="$emit('confirmDelete', v)">Löschen</button>
+          <button class="btn btn--sm btn--ghost" @click="$emit('openEdit', v)">{{ t('vehicles.edit') }}</button>
+          <button class="btn btn--sm btn--danger" @click="$emit('confirmDelete', v)">{{ t('vehicles.delete') }}</button>
         </div>
       </div>
     </div>
@@ -50,4 +50,6 @@ defineEmits<{
   openEdit: [vehicle: Vehicle]
   confirmDelete: [vehicle: Vehicle]
 }>()
+
+const { t } = useLocale()
 </script>

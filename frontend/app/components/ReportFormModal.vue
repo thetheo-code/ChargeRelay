@@ -3,7 +3,7 @@
     <div class="modal modal--wide">
 
       <div class="modal__header">
-        <h3 class="modal__title">{{ editingReport ? 'Report bearbeiten' : 'Neuer Report' }}</h3>
+        <h3 class="modal__title">{{ editingReport ? t('reportForm.titleEdit') : t('reportForm.titleNew') }}</h3>
         <button class="modal__close" @click="$emit('close')">✕</button>
       </div>
 
@@ -11,14 +11,14 @@
 
         <!-- Name -->
         <div class="form-group">
-          <label class="form-label">Name <span class="required">*</span></label>
-          <input v-model="form.name" class="form-input" placeholder="z.B. Monatsbericht Fuhrpark" type="text">
+          <label class="form-label">{{ t('reportForm.name') }} <span class="required">*</span></label>
+          <input v-model="form.name" class="form-input" :placeholder="t('reportForm.namePlaceholder')" type="text">
         </div>
 
-        <!-- Fahrzeuge -->
+        <!-- Vehicles -->
         <div class="form-group">
           <div class="vehicles-header">
-            <label class="form-label">Fahrzeuge <span class="required">*</span></label>
+            <label class="form-label">{{ t('reportForm.vehicles') }} <span class="required">*</span></label>
             <button
               v-if="vehicles.length > 0"
               type="button"
@@ -29,10 +29,10 @@
               <span class="select-all-btn__box">
                 <span v-if="allSelected" class="select-all-btn__tick">✔</span>
               </span>
-              Alle
+              {{ t('reportForm.selectAll') }}
             </button>
           </div>
-          <div v-if="vehicles.length === 0" class="form-hint">Noch keine Fahrzeuge vorhanden.</div>
+          <div v-if="vehicles.length === 0" class="form-hint">{{ t('reportForm.noVehicles') }}</div>
           <div v-else class="vehicle-checks">
             <label
               v-for="v in vehicles"
@@ -52,61 +52,61 @@
           </div>
         </div>
 
-        <!-- Lieferwege -->
+        <!-- Deliveries -->
         <div class="form-group">
           <div class="deliveries-header">
-            <label class="form-label">Lieferwege <span class="required">*</span></label>
-            <button type="button" class="btn btn--ghost btn--sm" @click="addDelivery">+ Hinzufügen</button>
+            <label class="form-label">{{ t('reportForm.deliveries') }} <span class="required">*</span></label>
+            <button type="button" class="btn btn--ghost btn--sm" @click="addDelivery">{{ t('reportForm.addDelivery') }}</button>
           </div>
 
           <div v-if="form.deliveries.length === 0" class="form-hint">
-            Noch kein Lieferweg – klicke „+ Hinzufügen".
+            {{ t('reportForm.noDeliveries') }}
           </div>
 
           <div class="delivery-list">
             <div v-for="(d, i) in form.deliveries" :key="i" class="delivery-item">
 
-              <!-- Typ-Auswahl -->
+              <!-- Type selection -->
               <div class="delivery-item__row">
                 <div class="form-group delivery-item__type">
-                  <label class="form-label">Typ</label>
+                  <label class="form-label">{{ t('reportForm.type') }}</label>
                   <select v-model="d.type" class="form-input">
-                    <option value="mail">E-Mail</option>
-                    <option value="ocpp">OCPP-Weiterleitung</option>
+                    <option value="mail">{{ t('reportForm.typeMail') }}</option>
+                    <option value="ocpp">{{ t('reportForm.typeOcpp') }}</option>
                   </select>
                 </div>
-                <button type="button" class="delivery-item__remove" @click="removeDelivery(i)" title="Entfernen">✕</button>
+                <button type="button" class="delivery-item__remove" @click="removeDelivery(i)" :title="t('reportForm.remove')">✕</button>
               </div>
 
-              <!-- Mail-Felder -->
+              <!-- Mail fields -->
               <template v-if="d.type === 'mail'">
                 <div class="delivery-item__row">
                   <div class="form-group delivery-item__field">
-                    <label class="form-label">E-Mail-Adresse <span class="required">*</span></label>
-                    <input v-model="d.email" class="form-input" type="email" placeholder="empfaenger@beispiel.de">
+                    <label class="form-label">{{ t('reportForm.email') }} <span class="required">*</span></label>
+                    <input v-model="d.email" class="form-input" type="email" :placeholder="t('reportForm.emailPlaceholder')">
                   </div>
                   <div class="form-group delivery-item__field">
-                    <label class="form-label">Intervall <span class="required">*</span></label>
+                    <label class="form-label">{{ t('reportForm.interval') }} <span class="required">*</span></label>
                     <select v-model="d.interval" class="form-input">
-                      <option value="daily">Täglich</option>
-                      <option value="weekly">Wöchentlich</option>
-                      <option value="monthly">Monatlich</option>
-                      <option value="yearly">Jährlich</option>
+                      <option value="daily">{{ t('reportForm.intervalDaily') }}</option>
+                      <option value="weekly">{{ t('reportForm.intervalWeekly') }}</option>
+                      <option value="monthly">{{ t('reportForm.intervalMonthly') }}</option>
+                      <option value="yearly">{{ t('reportForm.intervalYearly') }}</option>
                     </select>
                   </div>
                 </div>
               </template>
 
-              <!-- OCPP-Felder -->
+              <!-- OCPP fields -->
               <template v-if="d.type === 'ocpp'">
                 <div class="delivery-item__row">
                   <div class="form-group delivery-item__field delivery-item__field--grow">
-                    <label class="form-label">Adresse <span class="required">*</span></label>
-                    <input v-model="d.address" class="form-input mono" type="text" placeholder="relay.beispiel.de">
+                    <label class="form-label">{{ t('reportForm.address') }} <span class="required">*</span></label>
+                    <input v-model="d.address" class="form-input mono" type="text" :placeholder="t('reportForm.addressPlaceholder')">
                   </div>
                   <div class="form-group delivery-item__field delivery-item__field--port">
-                    <label class="form-label">Port <span class="required">*</span></label>
-                    <input v-model="d.port" class="form-input mono" type="number" placeholder="9000" min="1" max="65535">
+                    <label class="form-label">{{ t('reportForm.port') }} <span class="required">*</span></label>
+                    <input v-model="d.port" class="form-input mono" type="number" :placeholder="t('reportForm.portPlaceholder')" min="1" max="65535">
                   </div>
                 </div>
               </template>
@@ -118,9 +118,9 @@
       </div>
 
       <div class="modal__footer">
-        <button class="btn btn--ghost" @click="$emit('close')">Abbrechen</button>
+        <button class="btn btn--ghost" @click="$emit('close')">{{ t('reportForm.cancel') }}</button>
         <button class="btn btn--primary" @click="submit" :disabled="!canSave || saving">
-          {{ saving ? 'Speichern …' : 'Speichern' }}
+          {{ saving ? t('reportForm.saving') : t('reportForm.save') }}
         </button>
       </div>
 
@@ -150,6 +150,8 @@ type SavePayload = {
     port: number | null
   }[]
 }
+
+const { t } = useLocale()
 
 const props = defineProps<{
   editingReport: Report | null

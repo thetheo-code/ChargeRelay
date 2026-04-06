@@ -1,16 +1,16 @@
 <template>
   <section class="active-section">
 
-    <!-- Lädt -->
+    <!-- Loading -->
     <div v-if="loading" class="state-card">
       <div class="spinner"></div>
-      <span class="state-card__text">Verbinde…</span>
+      <span class="state-card__text">{{ t('active.loading') }}</span>
     </div>
 
-    <!-- Kein aktiver Ladevorgang -->
+    <!-- No active session -->
     <div v-else-if="sessions.length === 0" class="state-card state-card--idle">
-      <div class="state-card__text">Kein aktiver Ladevorgang</div>
-      <div class="state-card__sub">Gerät wartet auf Verbindung</div>
+      <div class="state-card__text">{{ t('active.noSession') }}</div>
+      <div class="state-card__sub">{{ t('active.noSessionSub') }}</div>
     </div>
 
     <!-- Aktive Ladevorgänge -->
@@ -29,6 +29,8 @@
 
 <script setup lang="ts">
 import type { ActiveSession, Vehicle } from '~/types'
+
+const { t } = useLocale()
 
 defineProps<{
   loading: boolean

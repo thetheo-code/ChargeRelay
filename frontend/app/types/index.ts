@@ -18,6 +18,7 @@ export interface ActiveSession {
   connector_id: number
   transaction_id: number | null
   id_tag: string
+  authorized_id_tag: string | null
   start_time: string
   start_meter_wh: number | null
   charge_point_id: string
@@ -27,6 +28,7 @@ export interface ActiveSession {
   latest_meter_values: MeterValue[]
   vehicle_id: number | null
   vehicle_name: string | null
+  session_energy_kwh: number | null
 }
 
 export interface Session {
@@ -34,6 +36,7 @@ export interface Session {
   connector_id: number
   transaction_id: number | null
   id_tag: string
+  authorized_id_tag: string | null
   start_time: string
   stop_time: string | null
   start_meter_wh: number | null

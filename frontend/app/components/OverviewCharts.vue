@@ -1,43 +1,43 @@
 <template>
   <section class="charts-section">
 
-    <div v-if="loading" class="loading-hint">Lade Statistiken …</div>
+    <div v-if="loading" class="loading-hint">{{ t('overview.loading') }}</div>
 
     <div v-else-if="error || !stats" class="stats-error">
-      Statistiken konnten nicht geladen werden.
-      <span class="stats-error__hint">Ist der API-Server erreichbar?</span>
+      {{ t('overview.error') }}
+      <span class="stats-error__hint">{{ t('overview.errorHint') }}</span>
     </div>
 
     <template v-else>
 
-      <!-- Stat-Kacheln -->
+      <!-- Stat tiles -->
       <div class="stat-row">
         <div class="stat-tile">
-          <div class="stat-tile__label">Ladevorgänge</div>
+          <div class="stat-tile__label">{{ t('overview.sessions') }}</div>
           <div class="stat-tile__value">{{ stats.total_sessions }}</div>
-          <div class="stat-tile__sub">letzte 30 Tage</div>
+          <div class="stat-tile__sub">{{ t('overview.last30Days') }}</div>
         </div>
         <div class="stat-tile">
-          <div class="stat-tile__label">Geladene Energie</div>
+          <div class="stat-tile__label">{{ t('overview.energy') }}</div>
           <div class="stat-tile__value">
             {{ fmtKwh(stats.total_kwh) }}<span class="stat-tile__unit">kWh</span>
           </div>
-          <div class="stat-tile__sub">letzte 30 Tage</div>
+          <div class="stat-tile__sub">{{ t('overview.last30Days') }}</div>
         </div>
         <div class="stat-tile" v-if="stats.total_sessions > 0">
-          <div class="stat-tile__label">Ø pro Ladung</div>
+          <div class="stat-tile__label">{{ t('overview.avgPerCharge') }}</div>
           <div class="stat-tile__value">
             {{ fmtKwh(stats.total_kwh / stats.total_sessions) }}<span class="stat-tile__unit">kWh</span>
           </div>
-          <div class="stat-tile__sub">letzte 30 Tage</div>
+          <div class="stat-tile__sub">{{ t('overview.last30Days') }}</div>
         </div>
       </div>
 
-      <!-- Chart 1: Energie pro Tag -->
+      <!-- Chart 1: Energy per day -->
       <div class="chart-card">
         <div class="chart-card__header">
-          <h3 class="chart-card__title">Energie pro Tag</h3>
-          <span class="chart-card__sub">letzte {{ stats.days }} Tage · kWh</span>
+          <h3 class="chart-card__title">{{ t('overview.energyPerDay') }}</h3>
+          <span class="chart-card__sub">{{ t('overview.perDaySub', { days: stats.days }) }}</span>
         </div>
 
         <div class="bar-chart-wrap">
@@ -77,11 +77,11 @@
         </div>
       </div>
 
-      <!-- Chart 2: Energie pro Fahrzeug -->
+      <!-- Chart 2: Energy per vehicle -->
       <div class="chart-card" v-if="stats.energy_per_vehicle.length > 0">
         <div class="chart-card__header">
-          <h3 class="chart-card__title">Energie pro Fahrzeug</h3>
-          <span class="chart-card__sub">gesamt · kWh</span>
+          <h3 class="chart-card__title">{{ t('overview.energyPerVehicle') }}</h3>
+          <span class="chart-card__sub">{{ t('overview.perVehicleSub') }}</span>
         </div>
 
         <div class="hbar-chart">
@@ -101,6 +101,8 @@
 
 <script setup lang="ts">
 import type { Stats } from '~/types'
+
+const { t, numLocale } = useLocale()
 
 const props = defineProps<{
   loading: boolean
@@ -137,16 +139,17 @@ function dayLabel(dateStr: string): string {
 const xAxisHint = computed(() => {
   const days = props.stats?.energy_per_day
   if (!days?.length) return ''
+  const locale = numLocale.value
   const first = new Date(days[0].date + 'T12:00:00')
   const last  = new Date(days[days.length - 1].date + 'T12:00:00')
-  const fmt = (d: Date) => d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+  const fmt = (d: Date) => d.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
   return first.getMonth() === last.getMonth()
     ? fmt(last)
-    : `${first.toLocaleDateString('de-DE', { month: 'short' })} – ${fmt(last)}`
+    : `${first.toLocaleDateString(locale, { month: 'short' })} – ${fmt(last)}`
 })
 
 function fmtKwh(v: number): string {
-  return v.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  return v.toLocaleString(numLocale.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 }
 </script>
 

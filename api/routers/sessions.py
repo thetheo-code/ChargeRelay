@@ -34,6 +34,7 @@ def get_active_sessions():
                 s.connector_id,
                 s.transaction_id,
                 s.id_tag,
+                s.authorized_id_tag,
                 s.start_time,
                 s.start_meter_wh,
                 s.vehicle_id,
@@ -76,6 +77,19 @@ def get_active_sessions():
             else:
                 s["latest_meter_values"] = []
 
+            # Compute session energy delta (current meter − start meter).
+            energy_mv = next(
+                (m for m in s["latest_meter_values"]
+                 if m["measurand"] == "Energy.Active.Import.Register"),
+                None,
+            )
+            if energy_mv is not None and s.get("start_meter_wh") is not None:
+                raw = float(energy_mv["value"])
+                current_wh = raw * 1000 if energy_mv["unit"] == "kWh" else raw
+                s["session_energy_kwh"] = max(0.0, (current_wh - s["start_meter_wh"]) / 1000)
+            else:
+                s["session_energy_kwh"] = None
+
     return sessions
 
 
@@ -103,6 +117,7 @@ def get_sessions(
                 s.connector_id,
                 s.transaction_id,
                 s.id_tag,
+                s.authorized_id_tag,
                 s.start_time,
                 s.stop_time,
                 s.start_meter_wh,

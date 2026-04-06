@@ -32,6 +32,9 @@ class ChargePoint(CP):
         self._cp_id = cp_id
         # Maps connector_id → active session row id.
         self._active_sessions: dict[int, int] = {}
+        # Last RFID tag accepted via Authorize (used as fallback when StartTransaction
+        # sends a dummy/zero tag, as some chargers like ABL do).
+        self._last_authorized_tag: str | None = None
 
     # -----------------------------------------------------------------------
     # Message interception
@@ -102,6 +105,7 @@ class ChargePoint(CP):
     @on(Action.Authorize)
     async def on_authorize(self, id_tag: str, **kwargs):
         """Accept all RFID tags – extend this method to enforce a whitelist."""
+        self._last_authorized_tag = id_tag
         logger.info("[%s] Authorize: id_tag=%s", self._cp_id, id_tag)
         return call_result.AuthorizePayload(
             id_tag_info={"status": AuthorizationStatus.accepted}
@@ -127,10 +131,11 @@ class ChargePoint(CP):
 
             cur.execute("""
                 INSERT INTO sessions
-                    (charge_point_id, connector_id, id_tag, start_time, start_meter_wh)
-                VALUES (%s, %s, %s, %s, %s)
+                    (charge_point_id, connector_id, id_tag, authorized_id_tag, start_time, start_meter_wh)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (self._cp_id, connector_id, id_tag, timestamp, meter_start))
+            """, (self._cp_id, connector_id, id_tag, self._last_authorized_tag,
+                  timestamp, meter_start))
 
             session_id     = cur.fetchone()[0]
             transaction_id = session_id   # re-use the row id as the transaction id
@@ -139,9 +144,14 @@ class ChargePoint(CP):
                 (transaction_id, session_id),
             )
 
-            # Look up the vehicle that owns this RFID tag and pre-assign it.
+            # Look up vehicle by the transaction tag first; fall back to the last
+            # authorized tag (some chargers send a dummy tag in StartTransaction but
+            # use the real RFID in the preceding Authorize request).
             cur.execute("SELECT id FROM vehicles WHERE id_tag = %s", (id_tag,))
             vehicle_row = cur.fetchone()
+            if not vehicle_row and self._last_authorized_tag and self._last_authorized_tag != id_tag:
+                cur.execute("SELECT id FROM vehicles WHERE id_tag = %s", (self._last_authorized_tag,))
+                vehicle_row = cur.fetchone()
             if vehicle_row:
                 cur.execute(
                     "UPDATE sessions SET vehicle_id = %s WHERE id = %s",

@@ -1,12 +1,9 @@
 services:
   ocpp-server:
     build: ./backend
+    env_file: .env
     environment:
       - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=ocpp
-      - DB_USER=ocpp
-      - DB_PASSWORD=ocpp
     depends_on:
       postgres:
         condition: service_healthy
@@ -16,12 +13,9 @@ services:
 
   ocpp-api:
     build: ./api
+    env_file: .env
     environment:
       - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=ocpp
-      - DB_USER=ocpp
-      - DB_PASSWORD=ocpp
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,7 +24,10 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - DEFAULT_LOCALE=${DEFAULT_LOCALE:-de}
     depends_on:
       - ocpp-api
     networks:

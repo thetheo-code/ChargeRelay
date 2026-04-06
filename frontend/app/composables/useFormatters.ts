@@ -1,6 +1,8 @@
 import type { ActiveSession, MeterValue } from '~/types'
 
 export function useFormatters() {
+  const { numLocale } = useLocale()
+
   function getMeter(s: ActiveSession, measurand: string): MeterValue | null {
     return s.latest_meter_values.find(m => m.measurand === measurand) ?? null
   }
@@ -17,26 +19,26 @@ export function useFormatters() {
 
   function formatDate(iso: string | null): string {
     if (!iso) return '–'
-    return new Date(iso).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
+    return new Date(iso).toLocaleString(numLocale.value, { dateStyle: 'short', timeStyle: 'short' })
   }
 
   function formatTime(iso: string | null): string {
     if (!iso) return '–'
-    return new Date(iso).toLocaleString('de-DE', { timeStyle: 'short' })
+    return new Date(iso).toLocaleString(numLocale.value, { timeStyle: 'short' })
   }
 
   function formatEnergy(m: MeterValue | null): string {
     if (!m) return '–'
     const v = Number(m.value)
-    const kwh = (m.unit === 'Wh' || v > 1000) ? v / 1000 : v
-    return kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const kwh = m.unit === 'Wh' ? v / 1000 : v
+    return kwh.toLocaleString(numLocale.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
   function formatPower(m: MeterValue | null): string {
     if (!m) return '–'
     const v = Number(m.value)
     const kw = m.unit === 'W' ? v / 1000 : v
-    return kw.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return kw.toLocaleString(numLocale.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
   return { getMeter, formatDuration, formatDate, formatTime, formatEnergy, formatPower }

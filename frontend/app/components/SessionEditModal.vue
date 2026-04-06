@@ -3,53 +3,53 @@
     <div class="modal">
 
       <div class="modal__header">
-        <h3 class="modal__title">Ladung bearbeiten</h3>
+        <h3 class="modal__title">{{ t('sessionEdit.title') }}</h3>
         <button class="modal__close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="modal__body">
 
-        <!-- Session-Info -->
+        <!-- Session info -->
         <div class="session-info">
           <div class="session-info__row">
-            <span class="session-info__label">Ladestation</span>
+            <span class="session-info__label">{{ t('sessionEdit.chargePoint') }}</span>
             <span class="session-info__val">
               {{ session.model || session.charge_point_id }}
               <span class="connector-badge">C{{ session.connector_id }}</span>
             </span>
           </div>
           <div class="session-info__row">
-            <span class="session-info__label">Start</span>
+            <span class="session-info__label">{{ t('sessionEdit.start') }}</span>
             <span class="session-info__val mono">{{ formatDate(session.start_time) }}</span>
           </div>
           <div class="session-info__row" v-if="session.stop_time">
-            <span class="session-info__label">Ende</span>
+            <span class="session-info__label">{{ t('sessionEdit.end') }}</span>
             <span class="session-info__val mono">{{ formatDate(session.stop_time) }}</span>
           </div>
           <div class="session-info__row" v-if="session.energy_kwh != null">
-            <span class="session-info__label">Energie</span>
+            <span class="session-info__label">{{ t('sessionEdit.energy') }}</span>
             <span class="session-info__val mono energy">
-              {{ session.energy_kwh.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} kWh
+              {{ session.energy_kwh.toLocaleString(numLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }} kWh
             </span>
           </div>
         </div>
 
-        <!-- Fahrzeug-Zuweisung -->
+        <!-- Vehicle assignment -->
         <div class="form-group">
-          <label class="form-label">Fahrzeug</label>
+          <label class="form-label">{{ t('sessionEdit.vehicle') }}</label>
           <select v-model="selectedVehicleId" class="form-input" :disabled="confirmingDelete">
-            <option :value="null">— Kein Fahrzeug —</option>
+            <option :value="null">{{ t('sessionEdit.noVehicle') }}</option>
             <option v-for="v in vehicles" :key="v.id" :value="v.id">{{ v.name }}</option>
           </select>
         </div>
 
-        <!-- Inline-Bestätigung Löschen -->
+        <!-- Delete confirmation -->
         <div v-if="confirmingDelete" class="delete-confirm">
-          <span class="delete-confirm__text">Ladung wirklich löschen?</span>
+          <span class="delete-confirm__text">{{ t('sessionEdit.deleteConfirm') }}</span>
           <div class="delete-confirm__btns">
-            <button class="btn btn--ghost btn--sm" @click="confirmingDelete = false">Abbrechen</button>
+            <button class="btn btn--ghost btn--sm" @click="confirmingDelete = false">{{ t('sessionEdit.cancel') }}</button>
             <button class="btn btn--danger btn--sm" @click="$emit('delete')" :disabled="saving">
-              {{ saving ? 'Löschen …' : 'Ja, löschen' }}
+              {{ saving ? t('sessionEdit.deleting') : t('sessionEdit.confirmDelete') }}
             </button>
           </div>
         </div>
@@ -57,17 +57,17 @@
       </div>
 
       <div class="modal__footer">
-        <!-- Löschen-Button links -->
+        <!-- Delete button left -->
         <button
           v-if="!confirmingDelete"
           class="btn btn--danger btn--sm footer-delete"
           @click="confirmingDelete = true"
-        >Löschen</button>
+        >{{ t('sessionEdit.delete') }}</button>
 
         <div class="footer-right">
-          <button class="btn btn--ghost" @click="$emit('close')" :disabled="saving">Abbrechen</button>
+          <button class="btn btn--ghost" @click="$emit('close')" :disabled="saving">{{ t('sessionEdit.cancel') }}</button>
           <button class="btn btn--primary" @click="submit" :disabled="saving || confirmingDelete">
-            {{ saving ? 'Speichern …' : 'Speichern' }}
+            {{ saving ? t('sessionEdit.saving') : t('sessionEdit.save') }}
           </button>
         </div>
       </div>
@@ -91,6 +91,7 @@ const emit = defineEmits<{
   delete: []
 }>()
 
+const { t, numLocale } = useLocale()
 const { formatDate } = useFormatters()
 
 const selectedVehicleId = ref<number | null>(props.session.vehicle_id)

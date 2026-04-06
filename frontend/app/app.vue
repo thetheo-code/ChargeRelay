@@ -1,6 +1,15 @@
 <template>
   <div class="app">
 
+    <!-- ── Password gate ─────────────────────────────────────────────────── -->
+    <template v-if="authChecked">
+      <LoginScreen
+        v-if="authRequired && !authenticated"
+        @authenticated="onAuthenticated"
+      />
+
+    <template v-else>
+
     <AppTopbar
       :activeTab="activeTab"
       :loading="loading"
@@ -88,6 +97,8 @@
       @delete="deleteSession"
     />
 
+    </template><!-- end v-else auth -->
+    </template><!-- end v-if authChecked -->
   </div>
 </template>
 
@@ -95,6 +106,38 @@
 import type { Vehicle, ActiveSession, Session, Report, Stats } from '~/types'
 
 const API = ''
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+
+const authChecked   = ref(false)
+const authRequired  = ref(false)
+const authenticated = ref(false)
+
+async function checkAuth() {
+  try {
+    const status = await $fetch<{ required: boolean }>(`${API}/api/auth/status`)
+    authRequired.value = status.required
+    if (!status.required) {
+      // No password configured – always authenticated.
+      authenticated.value = true
+    } else {
+      // Restore session from storage so a page reload doesn't re-prompt.
+      authenticated.value = sessionStorage.getItem('cr_auth') === '1'
+    }
+  } catch {
+    // If the API is unreachable we still show the app (auth check is best-effort).
+    authenticated.value = true
+  } finally {
+    // Always mark the check as complete so the template stops hiding everything.
+    authChecked.value = true
+  }
+}
+
+async function onAuthenticated() {
+  authenticated.value = true
+  await fetchVehicles()
+  await refresh()
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -362,8 +405,11 @@ async function assignVehicle(session_id: number) {
 // ── Lifecycle ──────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  await fetchVehicles()
-  await refresh()
+  await checkAuth()
+  if (authenticated.value) {
+    await fetchVehicles()
+    await refresh()
+  }
 })
 const interval = setInterval(refresh, 90_000)
 onUnmounted(() => clearInterval(interval))
@@ -428,8 +474,10 @@ body {
 }
 .topbar__brand { display: flex; align-items: center; gap: 0.5rem; }
 .topbar__bolt {
-  font-size: 1.2rem;
-  filter: drop-shadow(0 0 6px var(--accent));
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 5px rgba(22,163,74,0.5));
 }
 .topbar__title {
   font-size: 1rem;

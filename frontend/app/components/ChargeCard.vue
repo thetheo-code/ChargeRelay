@@ -1,10 +1,10 @@
 <template>
   <div class="charge-card">
 
-    <!-- Kopfzeile: Live-Indikator, Ladepunkt, Anschluss -->
+    <!-- Header: live indicator, charge point, connector -->
     <div class="charge-card__head">
       <div class="live-dot"></div>
-      <span class="charge-card__live-label">Live</span>
+      <span class="charge-card__live-label">{{ t('active.live') }}</span>
       <span class="charge-card__sep">·</span>
       <span class="charge-card__cp">{{ session.model || session.charge_point_id }}</span>
       <span class="badge">C{{ session.connector_id }}</span>
@@ -13,44 +13,44 @@
     <!-- Inhalt: Messwerte + Fahrzeug-Hero oder Zuweisung -->
     <div class="charge-card__body" :class="{ 'charge-card__body--with-vehicle': session.vehicle_id }">
 
-      <!-- Messwert-Raster -->
+      <!-- Metrics grid -->
       <div class="metrics-grid">
         <div class="metric">
-          <div class="metric__label">Laufzeit</div>
+          <div class="metric__label">{{ t('active.runtime') }}</div>
           <div class="metric__value">{{ formatDuration(session.duration_seconds) }}</div>
         </div>
-        <div class="metric" v-if="getMeter(session, 'Energy.Active.Import.Register')">
-          <div class="metric__label">Energie</div>
+        <div class="metric" v-if="session.session_energy_kwh != null">
+          <div class="metric__label">{{ t('active.energy') }}</div>
           <div class="metric__value metric__value--accent">
-            {{ formatEnergy(getMeter(session, 'Energy.Active.Import.Register')) }}<span class="metric__unit">kWh</span>
+            {{ session.session_energy_kwh.toLocaleString(numLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}<span class="metric__unit">kWh</span>
           </div>
         </div>
         <div class="metric" v-if="getMeter(session, 'Power.Active.Import')">
-          <div class="metric__label">Leistung</div>
+          <div class="metric__label">{{ t('active.power') }}</div>
           <div class="metric__value">
             {{ formatPower(getMeter(session, 'Power.Active.Import')) }}<span class="metric__unit">kW</span>
           </div>
         </div>
         <div class="metric" v-if="getMeter(session, 'SoC')">
-          <div class="metric__label">Ladestand</div>
+          <div class="metric__label">{{ t('active.soc') }}</div>
           <div class="metric__value metric__value--accent">
             {{ Number(getMeter(session, 'SoC')?.value).toFixed(0) }}<span class="metric__unit">%</span>
           </div>
         </div>
         <div class="metric" v-if="getMeter(session, 'Current.Import')">
-          <div class="metric__label">Strom</div>
+          <div class="metric__label">{{ t('active.current') }}</div>
           <div class="metric__value">
-            {{ Number(getMeter(session, 'Current.Import')?.value).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}<span class="metric__unit">A</span>
+            {{ Number(getMeter(session, 'Current.Import')?.value).toLocaleString(numLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }}<span class="metric__unit">A</span>
           </div>
         </div>
         <div class="metric" v-if="getMeter(session, 'Voltage')">
-          <div class="metric__label">Spannung</div>
+          <div class="metric__label">{{ t('active.voltage') }}</div>
           <div class="metric__value">
             {{ Number(getMeter(session, 'Voltage')?.value).toFixed(0) }}<span class="metric__unit">V</span>
           </div>
         </div>
         <div class="metric metric--date">
-          <div class="metric__label">Gestartet</div>
+          <div class="metric__label">{{ t('active.started') }}</div>
           <div class="metric__value">{{ formatTime(session.start_time) }}</div>
         </div>
       </div>
@@ -69,23 +69,25 @@
         <div class="vehicle-hero__name">
           {{ session.vehicle_name }}
           <span
-            v-if="getVehicle(session.vehicle_id)?.id_tag === session.id_tag"
+            v-if="getVehicle(session.vehicle_id)?.id_tag &&
+              (getVehicle(session.vehicle_id)?.id_tag === session.id_tag ||
+               getVehicle(session.vehicle_id)?.id_tag === session.authorized_id_tag)"
             class="rfid-check"
-            title="Automatisch per RFID erkannt"
+            :title="t('active.autoRfid')"
           >✔</span>
         </div>
       </div>
 
-      <!-- Fahrzeug zuweisen (wenn nicht zugewiesen) -->
+      <!-- Assign vehicle (when not yet assigned) -->
       <div v-if="!session.vehicle_id" class="assign-block">
-        <div class="assign-block__label">Fahrzeug zuweisen</div>
+        <div class="assign-block__label">{{ t('active.assignVehicle') }}</div>
         <div class="vehicle-assign">
           <select v-model="selectedVehicleId" class="sel" :disabled="vehicles.length === 0">
-            <option v-if="vehicles.length === 0" :value="null">Keine Fahrzeuge</option>
+            <option v-if="vehicles.length === 0" :value="null">{{ t('active.noVehicles') }}</option>
             <option v-for="v in vehicles" :key="v.id" :value="v.id">{{ v.name }}</option>
           </select>
           <button class="btn btn--sm btn--primary" @click="$emit('assign')" :disabled="!selectedVehicleId">
-            Zuweisen
+            {{ t('active.assign') }}
           </button>
         </div>
       </div>
@@ -102,7 +104,7 @@
     <!-- Animierter Ladebalken -->
     <div class="charge-anim">
       <div class="charge-anim__track"><div class="charge-anim__fill"></div></div>
-      <span class="charge-anim__label">Laden aktiv</span>
+      <span class="charge-anim__label">{{ t('active.charging') }}</span>
     </div>
   </div>
 </template>
@@ -121,6 +123,7 @@ const emit = defineEmits<{
   assign: []
 }>()
 
+const { t, numLocale } = useLocale()
 const { getMeter, formatDuration, formatTime, formatEnergy, formatPower } = useFormatters()
 
 const selectedVehicleId = computed({

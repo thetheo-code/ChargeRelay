@@ -2,24 +2,24 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal">
       <div class="modal__header">
-        <h3 class="modal__title">{{ editingVehicle ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug' }}</h3>
+        <h3 class="modal__title">{{ editingVehicle ? t('vehicleForm.titleEdit') : t('vehicleForm.titleNew') }}</h3>
         <button class="modal__close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="modal__body">
-        <!-- Bild-Upload -->
+        <!-- Image upload -->
         <div class="form-group">
-          <label class="form-label">Bild</label>
+          <label class="form-label">{{ t('vehicleForm.image') }}</label>
           <div class="image-upload">
             <img v-if="form.image_data" :src="form.image_data" class="image-preview" alt="">
-            <div v-else class="image-placeholder">Kein Bild ausgewählt</div>
+            <div v-else class="image-placeholder">–</div>
             <div class="image-upload__btns">
               <label class="btn btn--ghost btn--sm">
-                Bild wählen
+                {{ t('vehicleForm.chooseImage') }}
                 <input type="file" accept="image/*" class="sr-only" @change="handleImageUpload">
               </label>
               <button v-if="form.image_data" class="btn btn--ghost btn--sm" @click="form.image_data = null">
-                Entfernen
+                {{ t('vehicleForm.removeImage') }}
               </button>
             </div>
           </div>
@@ -27,22 +27,22 @@
 
         <!-- Name -->
         <div class="form-group">
-          <label class="form-label">Name <span class="required">*</span></label>
-          <input v-model="form.name" class="form-input" placeholder="z.B. ID 3" type="text">
+          <label class="form-label">{{ t('vehicleForm.name') }} <span class="required">*</span></label>
+          <input v-model="form.name" class="form-input" :placeholder="t('vehicleForm.namePlaceholder')" type="text">
         </div>
 
-        <!-- RFID-Tag -->
+        <!-- RFID tag -->
         <div class="form-group">
-          <label class="form-label">RFID-Tag</label>
-          <input v-model="form.id_tag" class="form-input mono" placeholder="z.B. RFID-0001" type="text">
-          <div class="form-hint">Wird beim Laden per RFID automatisch erkannt und zugewiesen</div>
+          <label class="form-label">{{ t('vehicleForm.rfid') }}</label>
+          <input v-model="form.id_tag" class="form-input mono" :placeholder="t('vehicleForm.rfidPlaceholder')" type="text">
+          <div class="form-hint">{{ t('vehicleForm.rfidHint') }}</div>
         </div>
       </div>
 
       <div class="modal__footer">
-        <button class="btn btn--ghost" @click="$emit('close')">Abbrechen</button>
+        <button class="btn btn--ghost" @click="$emit('close')">{{ t('vehicleForm.cancel') }}</button>
         <button class="btn btn--primary" @click="submit" :disabled="!form.name.trim() || saving">
-          {{ saving ? 'Speichern …' : 'Speichern' }}
+          {{ saving ? t('vehicleForm.saving') : t('vehicleForm.save') }}
         </button>
       </div>
     </div>
@@ -51,6 +51,8 @@
 
 <script setup lang="ts">
 import type { Vehicle } from '~/types'
+
+const { t } = useLocale()
 
 const props = defineProps<{
   editingVehicle: Vehicle | null

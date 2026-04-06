@@ -1,44 +1,44 @@
 <template>
   <section class="reports-section">
     <div class="section-header">
-      <h2 class="section-title">Reports</h2>
-      <button class="btn btn--primary" @click="$emit('openNew')">+ Neuer Report</button>
+      <h2 class="section-title">{{ t('reports.title') }}</h2>
+      <button class="btn btn--primary" @click="$emit('openNew')">{{ t('reports.new') }}</button>
     </div>
 
-    <div v-if="loading" class="loading-hint">Lade Reports …</div>
+    <div v-if="loading" class="loading-hint">{{ t('reports.loading') }}</div>
 
-    <!-- Leer-Zustand -->
+    <!-- Empty state -->
     <div v-else-if="reports.length === 0" class="empty-state">
       <div class="empty-state__icon">—</div>
-      <div class="empty-state__text">Noch keine Reports konfiguriert.</div>
-      <button class="btn btn--primary" @click="$emit('openNew')">Jetzt anlegen</button>
+      <div class="empty-state__text">{{ t('reports.empty') }}</div>
+      <button class="btn btn--primary" @click="$emit('openNew')">{{ t('reports.create') }}</button>
     </div>
 
-    <!-- Report-Liste -->
+    <!-- Report list -->
     <div v-else class="reports-list">
       <div v-for="r in reports" :key="r.id" class="report-card">
 
-        <!-- Kopf: Name + Aktionen -->
+        <!-- Header: name + actions -->
         <div class="report-card__head">
           <span class="report-card__name">{{ r.name }}</span>
           <div class="report-card__actions">
-            <button class="btn btn--sm btn--ghost" @click="$emit('openEdit', r)">Bearbeiten</button>
-            <button class="btn btn--sm btn--danger" @click="$emit('confirmDelete', r)">Löschen</button>
+            <button class="btn btn--sm btn--ghost" @click="$emit('openEdit', r)">{{ t('reports.edit') }}</button>
+            <button class="btn btn--sm btn--danger" @click="$emit('confirmDelete', r)">{{ t('reports.delete') }}</button>
           </div>
         </div>
 
-        <!-- Fahrzeuge -->
+        <!-- Vehicles -->
         <div class="report-card__section">
-          <span class="report-card__label">Fahrzeuge</span>
+          <span class="report-card__label">{{ t('reports.vehicles') }}</span>
           <div class="report-card__tags">
             <span v-for="v in r.vehicles" :key="v.id" class="tag tag--vehicle">{{ v.name }}</span>
-            <span v-if="r.vehicles.length === 0" class="tag tag--empty">Keine</span>
+            <span v-if="r.vehicles.length === 0" class="tag tag--empty">{{ t('reports.none') }}</span>
           </div>
         </div>
 
-        <!-- Lieferwege -->
+        <!-- Deliveries -->
         <div class="report-card__section">
-          <span class="report-card__label">Lieferwege</span>
+          <span class="report-card__label">{{ t('reports.deliveries') }}</span>
           <div class="report-card__deliveries">
             <div v-for="d in r.deliveries" :key="d.id" class="delivery-badge">
               <span class="delivery-badge__type">{{ d.type === 'mail' ? 'Mail' : 'OCPP' }}</span>
@@ -49,7 +49,7 @@
                 {{ d.address }}:{{ d.port }}
               </span>
             </div>
-            <span v-if="r.deliveries.length === 0" class="tag tag--empty">Keine</span>
+            <span v-if="r.deliveries.length === 0" class="tag tag--empty">{{ t('reports.none') }}</span>
           </div>
         </div>
 
@@ -72,15 +72,12 @@ defineEmits<{
   confirmDelete: [report: Report]
 }>()
 
-const INTERVAL_LABELS: Record<string, string> = {
-  daily:   'täglich',
-  weekly:  'wöchentlich',
-  monthly: 'monatlich',
-  yearly:  'jährlich',
-}
+const { t } = useLocale()
 
 function intervalLabel(v: string | null): string {
-  return v ? (INTERVAL_LABELS[v] ?? v) : '–'
+  if (!v) return '–'
+  const key = `reports.${v}` as const
+  return t(key) || v
 }
 </script>
 

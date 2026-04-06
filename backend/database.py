@@ -114,6 +114,12 @@ def init_db() -> None:
             ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id)
         """)
 
+        # Migration: store the RFID tag from Authorize (may differ from StartTransaction idTag).
+        cur.execute("""
+            ALTER TABLE sessions
+            ADD COLUMN IF NOT EXISTS authorized_id_tag TEXT
+        """)
+
         # Reports – named bundles of vehicles with scheduled deliveries.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS reports (
