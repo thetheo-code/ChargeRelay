@@ -36,10 +36,11 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    env_file: .env
     environment:
-      POSTGRES_DB: ocpp
-      POSTGRES_USER: ocpp
-      POSTGRES_PASSWORD: ocpp
+      POSTGRES_DB: ${DB_NAME:-ocpp}
+      POSTGRES_USER: ${DB_USER:-ocpp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
