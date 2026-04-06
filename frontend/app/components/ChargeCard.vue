@@ -19,7 +19,7 @@
           <div class="metric__label">{{ t('active.runtime') }}</div>
           <div class="metric__value">{{ formatDuration(session.duration_seconds) }}</div>
         </div>
-        <div class="metric" v-if="session.session_energy_kwh != null">
+        <div class="metric" v-if="session.session_energy_kwh != null && session.session_energy_kwh > 0">
           <div class="metric__label">{{ t('active.energy') }}</div>
           <div class="metric__value metric__value--accent">
             {{ session.session_energy_kwh.toLocaleString(numLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}<span class="metric__unit">kWh</span>

@@ -105,7 +105,15 @@
     "daily": "täglich",
     "weekly": "wöchentlich",
     "monthly": "monatlich",
-    "yearly": "jährlich"
+    "yearly": "jährlich",
+    "csvDownload": "CSV herunterladen",
+    "csvFrom": "Von",
+    "csvTo": "Bis",
+    "csvVehicles": "Fahrzeuge",
+    "csvAllVehicles": "Alle",
+    "csvDownloadBtn": "Herunterladen",
+    "csvDownloading": "Wird erstellt …",
+    "csvNoVehicle": "Kein Fahrzeug gewählt"
   },
   "reportForm": {
     "titleNew": "Neuer Report",

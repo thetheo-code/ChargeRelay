@@ -10,9 +10,12 @@ GET    /api/reports/{id}   Return a single report.
 PUT    /api/reports/{id}   Replace a report's configuration.
 DELETE /api/reports/{id}   Delete a report and all its deliveries.
 """
+import csv
+import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from database import db, db_write
 from models import DeliveryIn, ReportCreate, ReportUpdate
@@ -214,3 +217,140 @@ def delete_report(report_id: int):
         cur.execute("DELETE FROM reports WHERE id = %s", (report_id,))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Report not found")
+
+
+# ---------------------------------------------------------------------------
+# GET /api/reports/{report_id}/download
+# ---------------------------------------------------------------------------
+
+# CSV column headers indexed by language code.
+_CSV_HEADERS: dict[str, list[str]] = {
+    "de": ["Datum", "Start", "Ende", "Dauer (min)", "Ladestation",
+           "Connector", "Fahrzeug", "RFID-Tag", "Energie (kWh)", "Abbruchgrund"],
+    "en": ["Date", "Start", "End", "Duration (min)", "Charge Point",
+           "Connector", "Vehicle", "RFID Tag", "Energy (kWh)", "Stop Reason"],
+}
+
+
+@router.get("/reports/{report_id}/download")
+def download_report_csv(
+    report_id: int,
+    from_date: str = Query(..., description="Start date inclusive (YYYY-MM-DD)"),
+    to_date:   str = Query(..., description="End date inclusive (YYYY-MM-DD)"),
+    vehicle_ids: str | None = Query(
+        None,
+        description="Comma-separated vehicle IDs to include. "
+                    "Defaults to all vehicles in the report.",
+    ),
+    lang: str = Query("de", description="Column header language: 'de' or 'en'"),
+):
+    """Return a CSV file containing all completed sessions for the report's
+    vehicles within the given date range."""
+    with db() as conn:
+        cur = conn.cursor()
+
+        # Verify the report exists.
+        cur.execute("SELECT id, name FROM reports WHERE id = %s", (report_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Report not found")
+        report_name = row[1]
+
+        # Determine which vehicles to include.
+        if vehicle_ids:
+            try:
+                vid_list = [int(v.strip()) for v in vehicle_ids.split(",") if v.strip()]
+            except ValueError:
+                raise HTTPException(status_code=422, detail="vehicle_ids must be integers")
+        else:
+            # Default: all vehicles linked to the report.
+            cur.execute(
+                "SELECT vehicle_id FROM report_vehicles WHERE report_id = %s",
+                (report_id,),
+            )
+            vid_list = [r[0] for r in cur.fetchall()]
+
+        if not vid_list:
+            raise HTTPException(status_code=422, detail="No vehicles selected")
+
+        # Extend to_date to end-of-day so the upper bound is inclusive.
+        try:
+            from_dt = f"{from_date}T00:00:00"
+            to_dt   = f"{to_date}T23:59:59"
+        except Exception:
+            raise HTTPException(status_code=422, detail="Invalid date format, use YYYY-MM-DD")
+
+        # Fetch completed sessions within the date range for the selected vehicles.
+        cur.execute("""
+            SELECT
+                s.start_time,
+                s.stop_time,
+                cp.id           AS charge_point_id,
+                cp.model,
+                s.connector_id,
+                v.name          AS vehicle_name,
+                s.authorized_id_tag,
+                s.id_tag,
+                s.energy_kwh,
+                s.stop_reason
+            FROM sessions s
+            JOIN  charge_points cp ON cp.id = s.charge_point_id
+            LEFT JOIN vehicles  v  ON v.id  = s.vehicle_id
+            WHERE s.vehicle_id = ANY(%s)
+              AND s.stop_time IS NOT NULL
+              AND s.start_time >= %s
+              AND s.start_time <= %s
+            ORDER BY s.start_time ASC
+        """, (vid_list, from_dt, to_dt))
+        rows = cur.fetchall()
+
+    # Build CSV in memory.
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+
+    headers = _CSV_HEADERS.get(lang, _CSV_HEADERS["de"])
+    writer.writerow(headers)
+
+    for r in rows:
+        start_time, stop_time, cp_id, model, connector_id, \
+            vehicle_name, authorized_tag, id_tag, energy_kwh, stop_reason = r
+
+        # Parse timestamps for clean formatting.
+        try:
+            start_dt = datetime.fromisoformat(start_time)
+            date_str  = start_dt.strftime("%d.%m.%Y") if lang == "de" else start_dt.strftime("%Y-%m-%d")
+            start_str = start_dt.strftime("%H:%M")
+        except Exception:
+            date_str  = start_time or ""
+            start_str = ""
+
+        try:
+            stop_dt  = datetime.fromisoformat(stop_time) if stop_time else None
+            stop_str = stop_dt.strftime("%H:%M") if stop_dt else ""
+            duration = str(round((stop_dt - start_dt).total_seconds() / 60)) if stop_dt else ""
+        except Exception:
+            stop_str = stop_time or ""
+            duration = ""
+
+        writer.writerow([
+            date_str,
+            start_str,
+            stop_str,
+            duration,
+            model or cp_id,
+            connector_id,
+            vehicle_name or "",
+            authorized_tag or id_tag or "",
+            f"{energy_kwh:.3f}".replace(".", ",") if energy_kwh is not None else "",
+            stop_reason or "",
+        ])
+
+    buf.seek(0)
+    safe_name = report_name.replace(" ", "_").replace("/", "-")
+    filename  = f"{safe_name}_{from_date}_{to_date}.csv"
+
+    return StreamingResponse(
+        iter([buf.getvalue().encode("utf-8-sig")]),  # utf-8-sig = BOM for Excel compatibility
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
