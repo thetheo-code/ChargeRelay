@@ -31,7 +31,7 @@
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              CSV
+              PDF
             </button>
             <button class="btn btn--sm btn--ghost" @click="$emit('openEdit', r)">{{ t('reports.edit') }}</button>
             <button class="btn btn--sm btn--danger" @click="$emit('confirmDelete', r)">{{ t('reports.delete') }}</button>
@@ -198,7 +198,7 @@ async function downloadCsv(r: Report) {
     // Derive filename from Content-Disposition header or build a fallback.
     const cd       = res.headers.get('Content-Disposition') ?? ''
     const match    = cd.match(/filename="?([^"]+)"?/)
-    const filename = match ? match[1] : `${r.name}_${state.from}_${state.to}.csv`
+    const filename = match ? match[1] : `${r.name}_${state.from}_${state.to}.pdf`
 
     const link  = document.createElement('a')
     link.href   = URL.createObjectURL(blob)
@@ -221,7 +221,7 @@ function intervalLabel(v: string | null): string {
 
 <style scoped>
 .reports-section {
-  padding: 1.25rem;
+  padding: 1rem 0.9rem;
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
@@ -249,19 +249,34 @@ function intervalLabel(v: string | null): string {
 
 .report-card__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 .report-card__name {
   font-weight: 700;
   font-size: 1rem;
   color: var(--text);
+  flex: 1 1 140px;
+  min-width: 0;
+  word-break: break-word;
 }
 .report-card__actions {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+@media (max-width: 480px) {
+  .report-card__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .report-card__actions .btn {
+    flex: 1 1 auto;
+    min-height: 36px;
+  }
 }
 
 .report-card__section {
@@ -352,20 +367,33 @@ function intervalLabel(v: string | null): string {
 }
 
 .csv-panel__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 520px) {
+  .csv-panel__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: flex-start;
+  }
 }
 
 .csv-field {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  min-width: 130px;
+  min-width: 0;
+}
+@media (min-width: 520px) {
+  .csv-field { min-width: 130px; }
 }
 .csv-field--vehicles {
-  min-width: 200px;
+  min-width: 0;
+}
+@media (min-width: 520px) {
+  .csv-field--vehicles { min-width: 200px; }
 }
 .csv-field__label {
   font-size: 0.68rem;
@@ -380,11 +408,12 @@ function intervalLabel(v: string | null): string {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 0.82rem;
-  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
   outline: none;
   transition: border-color 0.15s;
   width: 100%;
+  min-height: 42px;
 }
 .csv-input:focus {
   border-color: var(--accent);
@@ -413,8 +442,17 @@ function intervalLabel(v: string | null): string {
 
 .csv-panel__footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+.csv-panel__footer .btn {
+  min-height: 40px;
+}
+@media (max-width: 480px) {
+  .csv-panel__footer .btn {
+    width: 100%;
+  }
 }
 .csv-warn {
   font-size: 0.78rem;

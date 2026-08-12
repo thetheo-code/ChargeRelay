@@ -255,18 +255,31 @@ async function downloadCsv() {
   gap: 0.75rem;
 }
 .csv-panel__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 520px) {
+  .csv-panel__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: flex-start;
+  }
 }
 .csv-field {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  min-width: 130px;
+  min-width: 0;
 }
-.csv-field--vehicles { min-width: 220px; }
+@media (min-width: 520px) {
+  .csv-field { min-width: 130px; }
+}
+.csv-field--vehicles { min-width: 0; }
+@media (min-width: 520px) {
+  .csv-field--vehicles { min-width: 220px; }
+}
 .csv-field__label {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -279,10 +292,12 @@ async function downloadCsv() {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 0.82rem;
-  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
   outline: none;
   transition: border-color 0.15s;
+  width: 100%;
+  min-height: 42px;
 }
 .csv-input:focus { border-color: var(--accent); }
 .csv-vehicles {
@@ -306,7 +321,16 @@ async function downloadCsv() {
   height: 14px;
   cursor: pointer;
 }
-.csv-panel__footer { display: flex; align-items: center; gap: 0.75rem; }
+.csv-panel__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.csv-panel__footer .btn { min-height: 40px; }
+@media (max-width: 480px) {
+  .csv-panel__footer .btn { width: 100%; }
+}
 
 .csv-panel-enter-active,
 .csv-panel-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }

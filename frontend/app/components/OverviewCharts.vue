@@ -155,16 +155,19 @@ function fmtKwh(v: number): string {
 
 <style scoped>
 .charts-section {
-  padding: 0 1.25rem 1.25rem;
+  padding: 0 0.9rem 1rem;
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 @media (min-width: 640px) {
-  .charts-section { padding: 0 2rem 1.75rem; }
+  .charts-section {
+    padding: 0 2rem 1.75rem;
+    gap: 1.25rem;
+  }
 }
 
 /* ── Fehler-Zustand ─────────────────────────────────────────────────── */
@@ -187,15 +190,24 @@ function fmtKwh(v: number): string {
 /* ── Stat-Kacheln ───────────────────────────────────────────────────── */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.875rem;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 420px) {
+  .stat-row {
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 0.875rem;
+  }
 }
 .stat-tile {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.15rem;
   box-shadow: var(--shadow);
+}
+@media (min-width: 640px) {
+  .stat-tile { padding: 1.25rem 1.5rem; }
 }
 .stat-tile__label {
   font-size: 0.7rem;
@@ -206,7 +218,7 @@ function fmtKwh(v: number): string {
   margin-bottom: 0.4rem;
 }
 .stat-tile__value {
-  font-size: 2.2rem;
+  font-size: 1.75rem;
   font-weight: 600;
   color: var(--text);
   line-height: 1;
@@ -214,6 +226,9 @@ function fmtKwh(v: number): string {
   display: flex;
   align-items: baseline;
   gap: 4px;
+}
+@media (min-width: 640px) {
+  .stat-tile__value { font-size: 2.2rem; }
 }
 .stat-tile__unit {
   font-size: 1rem;
@@ -231,14 +246,27 @@ function fmtKwh(v: number): string {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.5rem;
+  padding: 1rem 0.9rem 1.1rem;
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .chart-card { padding: 1.5rem; }
 }
 .chart-card__header {
   display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 560px) {
+  .chart-card__header {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
 }
 .chart-card__title {
   font-size: 0.875rem;
@@ -262,8 +290,11 @@ function fmtKwh(v: number): string {
   flex-direction: column;
   justify-content: space-between;
   padding-bottom: 1.75rem; /* Platz für x-Labels */
-  min-width: 36px;
+  min-width: 28px;
   text-align: right;
+}
+@media (min-width: 640px) {
+  .y-axis { min-width: 36px; }
 }
 .y-label {
   font-size: 0.65rem;
@@ -294,10 +325,19 @@ function fmtKwh(v: number): string {
 .bars {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
-  height: 240px;
+  gap: 2px;
+  height: 180px;
   padding-bottom: 1.75rem; /* Platz für Labels */
   position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 640px) {
+  .bars {
+    gap: 4px;
+    height: 240px;
+    overflow-x: visible;
+  }
 }
 
 .bar-col {
@@ -324,8 +364,14 @@ function fmtKwh(v: number): string {
   bottom: calc(1.75rem + 100%);
   pointer-events: none;
 }
-.bar-col:hover .bar-tip {
+.bar-col:hover .bar-tip,
+.bar-col:focus-within .bar-tip {
   opacity: 1;
+}
+@media (hover: none) {
+  .bar-col--today .bar-tip {
+    opacity: 0.9;
+  }
 }
 
 .bar {
@@ -348,12 +394,15 @@ function fmtKwh(v: number): string {
 .bar-day {
   position: absolute;
   bottom: 0;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
   height: 1.6rem;
   display: flex;
   align-items: center;
+}
+@media (min-width: 640px) {
+  .bar-day { font-size: 0.65rem; }
 }
 .bar-col--today .bar-day {
   color: var(--accent);
@@ -375,9 +424,15 @@ function fmtKwh(v: number): string {
 }
 .hbar-row {
   display: grid;
-  grid-template-columns: minmax(80px, 180px) 1fr 64px;
+  grid-template-columns: minmax(64px, 28%) 1fr minmax(44px, auto);
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.55rem;
+}
+@media (min-width: 560px) {
+  .hbar-row {
+    grid-template-columns: minmax(80px, 180px) 1fr 64px;
+    gap: 0.875rem;
+  }
 }
 .hbar-name {
   font-size: 0.825rem;

@@ -1,3 +1,4 @@
 psycopg2-binary>=2.9
 fastapi>=0.111
 uvicorn[standard]>=0.29
+reportlab>=4.0
