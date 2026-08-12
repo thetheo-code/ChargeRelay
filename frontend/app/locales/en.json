@@ -54,7 +54,8 @@
     "csvVehicles": "Vehicles",
     "csvAllVehicles": "All",
     "csvDownloadBtn": "Download",
-    "csvDownloading": "Preparing …"
+    "csvDownloading": "Preparing …",
+    "pdfDownloadBtn": "Download PDF"
   },
   "sessionEdit": {
     "title": "Edit Session",
@@ -111,15 +112,7 @@
     "daily": "daily",
     "weekly": "weekly",
     "monthly": "monthly",
-    "yearly": "yearly",
-    "csvDownload": "Download PDF",
-    "csvFrom": "From",
-    "csvTo": "To",
-    "csvVehicles": "Vehicles",
-    "csvAllVehicles": "All",
-    "csvDownloadBtn": "Download PDF",
-    "csvDownloading": "Preparing …",
-    "csvNoVehicle": "No vehicle selected"
+    "yearly": "yearly"
   },
   "reportForm": {
     "titleNew": "New Report",

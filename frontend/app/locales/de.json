@@ -54,7 +54,8 @@
     "csvVehicles": "Fahrzeuge",
     "csvAllVehicles": "Alle",
     "csvDownloadBtn": "Herunterladen",
-    "csvDownloading": "Wird erstellt …"
+    "csvDownloading": "Wird erstellt …",
+    "pdfDownloadBtn": "PDF herunterladen"
   },
   "sessionEdit": {
     "title": "Ladung bearbeiten",
@@ -111,15 +112,7 @@
     "daily": "täglich",
     "weekly": "wöchentlich",
     "monthly": "monatlich",
-    "yearly": "jährlich",
-    "csvDownload": "PDF herunterladen",
-    "csvFrom": "Von",
-    "csvTo": "Bis",
-    "csvVehicles": "Fahrzeuge",
-    "csvAllVehicles": "Alle",
-    "csvDownloadBtn": "PDF herunterladen",
-    "csvDownloading": "Wird erstellt …",
-    "csvNoVehicle": "Kein Fahrzeug gewählt"
+    "yearly": "jährlich"
   },
   "reportForm": {
     "titleNew": "Neuer Report",

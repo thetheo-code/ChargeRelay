@@ -8,6 +8,8 @@ GET    /api/active                  Return all currently active sessions.
 GET    /api/sessions                Return paginated session history.
 DELETE /api/sessions/{id}           Delete a session and its meter values.
 PUT    /api/sessions/{id}/vehicle   Assign (or unassign) a vehicle to a session.
+GET    /api/sessions/download       CSV export of completed sessions.
+GET    /api/sessions/download/pdf   PDF export of completed sessions.
 """
 import csv
 import io
@@ -18,6 +20,7 @@ from fastapi.responses import StreamingResponse
 
 from database import db, db_write, row_to_dict
 from models import SessionVehicleUpdate
+from pdf_report import build_report_pdf
 
 router = APIRouter(prefix="/api")
 
@@ -317,5 +320,83 @@ def download_sessions_csv(
     return StreamingResponse(
         iter([buf.getvalue().encode("utf-8-sig")]),
         media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/sessions/download/pdf
+# ---------------------------------------------------------------------------
+
+@router.get("/sessions/download/pdf")
+def download_sessions_pdf(
+    from_date: str = Query(..., description="Start date inclusive (YYYY-MM-DD)"),
+    to_date:   str = Query(..., description="End date inclusive (YYYY-MM-DD)"),
+    vehicle_ids: str | None = Query(
+        None,
+        description="Comma-separated vehicle IDs to filter by. "
+                    "Omit to export all sessions.",
+    ),
+    lang: str = Query("de", description="Column header language: 'de' or 'en'"),
+):
+    """Return a PDF file of all completed sessions within the given date range."""
+    from_dt = f"{from_date}T00:00:00"
+    to_dt   = f"{to_date}T23:59:59"
+
+    vid_list: list[int] | None = None
+    if vehicle_ids:
+        try:
+            vid_list = [int(v.strip()) for v in vehicle_ids.split(",") if v.strip()]
+        except ValueError:
+            raise HTTPException(status_code=422, detail="vehicle_ids must be integers")
+
+    with db() as conn:
+        cur = conn.cursor()
+
+        if vid_list:
+            cur.execute("""
+                SELECT
+                    s.start_time, s.stop_time,
+                    cp.id AS charge_point_id, cp.model,
+                    s.connector_id,
+                    v.name  AS vehicle_name,
+                    s.authorized_id_tag, s.id_tag,
+                    s.energy_kwh, s.stop_reason
+                FROM sessions s
+                JOIN  charge_points cp ON cp.id = s.charge_point_id
+                LEFT JOIN vehicles  v  ON v.id  = s.vehicle_id
+                WHERE s.stop_time IS NOT NULL
+                  AND s.start_time >= %s
+                  AND s.start_time <= %s
+                  AND s.vehicle_id = ANY(%s)
+                ORDER BY s.start_time ASC
+            """, (from_dt, to_dt, vid_list))
+        else:
+            cur.execute("""
+                SELECT
+                    s.start_time, s.stop_time,
+                    cp.id AS charge_point_id, cp.model,
+                    s.connector_id,
+                    v.name  AS vehicle_name,
+                    s.authorized_id_tag, s.id_tag,
+                    s.energy_kwh, s.stop_reason
+                FROM sessions s
+                JOIN  charge_points cp ON cp.id = s.charge_point_id
+                LEFT JOIN vehicles  v  ON v.id  = s.vehicle_id
+                WHERE s.stop_time IS NOT NULL
+                  AND s.start_time >= %s
+                  AND s.start_time <= %s
+                ORDER BY s.start_time ASC
+            """, (from_dt, to_dt))
+
+        rows = cur.fetchall()
+
+    title = "Ladevorgänge" if lang == "de" else "Sessions"
+    pdf_bytes = build_report_pdf(title, from_date, to_date, rows, lang)
+    filename = f"ladevorgaenge_{from_date}_{to_date}.pdf"
+
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

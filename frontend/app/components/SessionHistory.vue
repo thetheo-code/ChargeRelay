@@ -2,21 +2,33 @@
   <section class="history-section">
     <div class="section-header">
       <h2 class="section-title">{{ t('sessions.title') }}</h2>
-      <button
-        class="btn btn--sm btn--ghost btn--csv"
-        :class="{ 'btn--csv-open': csvOpen }"
-        @click="csvOpen = !csvOpen"
-      >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-          <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        CSV
-      </button>
+      <div class="export-btns">
+        <button
+          class="btn btn--sm btn--ghost btn--csv"
+          :class="{ 'btn--csv-open': exportOpen && exportKind === 'csv' }"
+          @click="toggleExport('csv')"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          CSV
+        </button>
+        <button
+          class="btn btn--sm btn--ghost btn--csv"
+          :class="{ 'btn--csv-open': exportOpen && exportKind === 'pdf' }"
+          @click="toggleExport('pdf')"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          PDF
+        </button>
+      </div>
     </div>
 
-    <!-- CSV export panel -->
+    <!-- Export panel (CSV / PDF) -->
     <Transition name="csv-panel">
-      <div v-if="csvOpen" class="csv-panel">
+      <div v-if="exportOpen" class="csv-panel">
         <div class="csv-panel__grid">
           <div class="csv-field">
             <label class="csv-field__label">{{ t('sessions.csvFrom') }}</label>
@@ -44,12 +56,14 @@
           <button
             class="btn btn--primary btn--sm"
             :disabled="csvDownloading"
-            @click="downloadCsv"
+            @click="downloadExport"
           >
             <svg v-if="!csvDownloading" width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M8 1v9M4 7l4 4 4-4M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            {{ csvDownloading ? t('sessions.csvDownloading') : t('sessions.csvDownloadBtn') }}
+            {{ csvDownloading
+              ? t('sessions.csvDownloading')
+              : (exportKind === 'pdf' ? t('sessions.pdfDownloadBtn') : t('sessions.csvDownloadBtn')) }}
           </button>
         </div>
       </div>
@@ -186,16 +200,25 @@ function firstOfMonthStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
-const csvOpen             = ref(false)
+type ExportKind = 'csv' | 'pdf'
+
+const exportOpen          = ref(false)
+const exportKind          = ref<ExportKind>('csv')
 const csvFrom             = ref(firstOfMonthStr())
 const csvTo               = ref(todayStr())
 const csvAllVehicles      = ref(true)
 const csvSelectedVehicles = ref<number[]>([])
 const csvDownloading      = ref(false)
 
-watch(csvOpen, (open) => {
-  if (open) csvSelectedVehicles.value = props.vehicles.map(v => v.id)
-})
+function toggleExport(kind: ExportKind) {
+  if (exportOpen.value && exportKind.value === kind) {
+    exportOpen.value = false
+    return
+  }
+  exportKind.value = kind
+  exportOpen.value = true
+  csvSelectedVehicles.value = props.vehicles.map(v => v.id)
+}
 
 watch(csvSelectedVehicles, (sel) => {
   csvAllVehicles.value = sel.length === props.vehicles.length
@@ -205,19 +228,24 @@ function onToggleAll() {
   csvSelectedVehicles.value = csvAllVehicles.value ? props.vehicles.map(v => v.id) : []
 }
 
-async function downloadCsv() {
+async function downloadExport() {
   csvDownloading.value = true
   try {
     const params = new URLSearchParams({ from_date: csvFrom.value, to_date: csvTo.value, lang: locale.value })
     if (!csvAllVehicles.value && csvSelectedVehicles.value.length > 0) {
       params.set('vehicle_ids', csvSelectedVehicles.value.join(','))
     }
-    const res  = await fetch(`/api/sessions/download?${params}`)
+    const isPdf = exportKind.value === 'pdf'
+    const url = isPdf
+      ? `/api/sessions/download/pdf?${params}`
+      : `/api/sessions/download?${params}`
+    const res  = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const blob = await res.blob()
     const cd   = res.headers.get('Content-Disposition') ?? ''
     const match = cd.match(/filename="?([^"]+)"?/)
-    const filename = match ? match[1] : `ladevorgaenge_${csvFrom.value}_${csvTo.value}.csv`
+    const ext = isPdf ? 'pdf' : 'csv'
+    const filename = match ? match[1] : `ladevorgaenge_${csvFrom.value}_${csvTo.value}.${ext}`
     const link = document.createElement('a')
     link.href  = URL.createObjectURL(blob)
     link.download = filename
@@ -230,7 +258,12 @@ async function downloadCsv() {
 </script>
 
 <style scoped>
-/* ── CSV button ──────────────────────────────────────────────────────────── */
+/* ── Export buttons ──────────────────────────────────────────────────── */
+.export-btns {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 .btn--csv {
   display: inline-flex;
   align-items: center;
